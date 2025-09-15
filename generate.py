@@ -6,6 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse
 from datetime import datetime, timedelta
+import time
 
 # --- CONFIGURATION ---
 MODE = os.getenv("SCRAPER_MODE", "test5")  # "test5" | "all" | "new_only"
@@ -40,6 +41,7 @@ yesterday = today - timedelta(days=1)
 while archive_url:
     print(f"Fetching {archive_url}")
     r = session.get(archive_url)
+    time.sleep(1)  # polite pause
     content = r.json()["html"] if "application/json" in r.headers.get("Content-Type", "") else r.content
     archive = BeautifulSoup(content, "html.parser")
 
@@ -53,6 +55,7 @@ while archive_url:
         print(f"Scraping episode {ep_slug}")
 
         r_episode = session.get(full_url)
+        time.sleep(1)  # polite pause
         episode = BeautifulSoup(r_episode.content, "html.parser")
 
         # --- Episode date ---
