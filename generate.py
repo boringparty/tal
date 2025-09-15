@@ -13,14 +13,26 @@ MAX_EPISODES = 5 if MODE == "test5" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
 
-# --- SETUP ---
-with open("base.xml", "r") as f:
-    feed = BeautifulSoup(f.read(), "xml")
+# --- LOAD FEED ---
+if pull_new_only and os.path.exists("feed.xml"):
+    with open("feed.xml", "r") as f:
+        feed = BeautifulSoup(f.read(), "xml")
+else:
+    with open("base.xml", "r") as f:
+        feed = BeautifulSoup(f.read(), "xml")
 
 channel = feed.find("channel")
+
+# Track existing episodes to avoid duplicates
+existing_episodes = set()
+for item in channel.find_all("item"):
+    ep_tag = item.find("itunes:episode")
+    if ep_tag:
+        existing_episodes.add(ep_tag.text.strip())
+
+# --- SETUP ---
 archive_url = "https://www.thisamericanlife.org/archive"
 session = requests.Session()
-
 today = datetime.utcnow()
 yesterday = today - timedelta(days=1)
 
@@ -54,17 +66,21 @@ while archive_url:
             episode_date = None
 
         # Skip old episodes if mode is new_only
-        if pull_new_only and episode_date and episode_date.date() < yesterday.date():
+        # Also skip if already in feed
+        title_meta = episode.select_one("script#playlist-data")
+        if not title_meta:
             continue
-
-        # --- Audio ---
-        player_data_tag = episode.select_one("script#playlist-data")
-        if not player_data_tag:
-            continue
-        player_data = json.loads(player_data_tag.string)
+        player_data = json.loads(title_meta.string)
         if "audio" not in player_data:
             continue
+        ep_num = player_data["title"].split(":", 1)[0].strip()
+        if pull_new_only:
+            if ep_num in existing_episodes:
+                continue
+            if episode_date and episode_date.date() < yesterday.date():
+                continue
 
+        # --- Audio ---
         audio_url = player_data["audio"]
         final_url = session.head(audio_url, allow_redirects=True).url
         parsed = urlparse(final_url)
@@ -73,57 +89,56 @@ while archive_url:
         if "/promos/" in clean_url:
             player_data["title"] += " (Promo)"
 
-        # --- Build RSS item ---
-        item_tag = feed.new_tag("item")
+        # --- Build main item ---
+        def make_item(title_text, explicit_val, audio_link):
+            item_tag = feed.new_tag("item")
 
-        # Title
-        title_tag = feed.new_tag("title")
-        title_tag.string = player_data["title"]
-        item_tag.append(title_tag)
+            title_tag = feed.new_tag("title")
+            title_tag.string = title_text
+            item_tag.append(title_tag)
 
-        # Link
-        link_tag = feed.new_tag("link")
-        link_tag.string = full_url
-        item_tag.append(link_tag)
+            link_tag = feed.new_tag("link")
+            link_tag.string = full_url
+            item_tag.append(link_tag)
 
-        # iTunes episode number (numeric)
-        if ":" in player_data["title"]:
-            episode_num = player_data["title"].split(":", 1)[0].strip()
-        else:
-            episode_num = episode_slug
-        itunes_tag = feed.new_tag("itunes:episode")
-        itunes_tag.string = episode_num
-        item_tag.append(itunes_tag)
+            itunes_tag = feed.new_tag("itunes:episode")
+            itunes_tag.string = ep_num
+            item_tag.append(itunes_tag)
 
-        # iTunes episodeType
-        ep_type_tag = feed.new_tag("itunes:episodeType")
-        ep_type_tag.string = "full"
-        item_tag.append(ep_type_tag)
+            ep_type_tag = feed.new_tag("itunes:episodeType")
+            ep_type_tag.string = "full"
+            item_tag.append(ep_type_tag)
 
-        # iTunes explicit
-        explicit_tag = feed.new_tag("itunes:explicit")
-        explicit_tag.string = "yes"
-        item_tag.append(explicit_tag)
+            explicit_tag = feed.new_tag("itunes:explicit")
+            explicit_tag.string = explicit_val
+            item_tag.append(explicit_tag)
 
-        # Description
-        desc_meta = episode.select_one("meta[name='description']")
-        desc_tag = feed.new_tag("description")
-        desc_tag.string = desc_meta["content"] if desc_meta else ""
-        item_tag.append(desc_tag)
+            desc_meta = episode.select_one("meta[name='description']")
+            desc_tag = feed.new_tag("description")
+            desc_tag.string = desc_meta["content"] if desc_meta else ""
+            item_tag.append(desc_tag)
 
-        # PubDate
-        pub_date_tag = feed.new_tag("pubDate")
-        pub_date_tag.string = episode_date.strftime("%a, %d %b %Y 00:00:00 +0000") if episode_date else ""
-        item_tag.append(pub_date_tag)
+            pub_date_tag = feed.new_tag("pubDate")
+            pub_date_tag.string = episode_date.strftime("%a, %d %b %Y 00:00:00 +0000") if episode_date else ""
+            item_tag.append(pub_date_tag)
 
-        # Enclosure
-        enclosure_tag = feed.new_tag("enclosure")
-        enclosure_tag["url"] = clean_url
-        enclosure_tag["type"] = "audio/mpeg"
-        item_tag.append(enclosure_tag)
+            enclosure_tag = feed.new_tag("enclosure")
+            enclosure_tag["url"] = audio_link
+            enclosure_tag["type"] = "audio/mpeg"
+            item_tag.append(enclosure_tag)
 
-        channel.append(item_tag)
+            return item_tag
+
+        # Append main episode
+        channel.append(make_item(player_data["title"], "yes", clean_url))
+        existing_episodes.add(ep_num)
         count += 1
+
+        # --- Check for clean version ---
+        clean_link_tag = episode.select_one('a[href*="clean"]')
+        if clean_link_tag:
+            clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
+            channel.append(make_item(player_data["title"] + " (Clean)", "no", clean_audio_url))
 
     # --- Next page ---
     next_link = archive.select_one("a.pager")
@@ -134,4 +149,5 @@ while archive_url:
 
 # --- Write feed.xml ---
 with open("feed.xml", "w") as out:
-    out.write(feed.prettify())
+    # compact formatting: one tag per line
+    out.write(feed.prettify(formatter=None).replace("\n  ", ""))
