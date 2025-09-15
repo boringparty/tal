@@ -6,13 +6,14 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse
 from datetime import datetime, timedelta
-from time import sleep
+import time
 
 # --- CONFIGURATION ---
 MODE = os.getenv("SCRAPER_MODE", "test5")  # "test5" | "all" | "new_only"
 MAX_EPISODES = 5 if MODE == "test5" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
+REQUEST_SLEEP = 1  # seconds between episode requests
 
 # --- LOAD FEED ---
 if pull_new_only and os.path.exists("feed.xml"):
@@ -24,7 +25,7 @@ else:
 
 channel = feed.find("channel")
 
-# Track existing episodes to avoid duplicates
+# Track existing episodes
 existing_episodes = set()
 for item in channel.find_all("item"):
     ep_tag = item.find("itunes:episode")
@@ -54,7 +55,6 @@ while archive_url:
         print(f"Scraping episode {ep_slug}")
 
         r_episode = session.get(full_url)
-        sleep(1)  # polite pause
         episode = BeautifulSoup(r_episode.content, "html.parser")
 
         # --- Episode date ---
@@ -89,38 +89,34 @@ while archive_url:
         if "/promos/" in clean_url:
             player_data["title"] += " (Promo)"
 
-        # --- Build full description ---
+        # --- Build description ---
         desc_parts = []
         meta_desc = episode.select_one("meta[name='description']")
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
 
-        # Only include main episode acts, skip related episodes
-        for container in episode.select("div.field-item.even, div.field-item.odd"):
-            act = container.find("article.node-act")
-            if not act:
-                continue
-                
+        # Only select acts inside the main episode container
+        for act in episode.select("div.field-items > div.field-item > article.node-act"):
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
             act_desc_tag = act.select_one(".field-name-body .field-item p")
-            
+
             act_label = act_label_tag.text.strip() if act_label_tag else ""
             act_title = act_title_tag.text.strip() if act_title_tag else ""
             act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
-            
+
             # Avoid "Prologue: Prologue"
             if act_label.lower() == "prologue":
                 act_label_text = act_label
                 if act_title and act_title.lower() != "prologue":
-                    act_label_text += f": {act_title}"
+                    act_label_text += f"\n{act_desc}" if act_desc else ""
             else:
                 act_label_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
-            
+                if act_desc:
+                    act_label_text += f"\n{act_desc}"
+
             if act_label_text:
                 desc_parts.append(act_label_text)
-            if act_desc:
-                desc_parts.append(act_desc)
 
         full_description = "\n\n".join(desc_parts)
 
@@ -174,11 +170,12 @@ while archive_url:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
             channel.append(make_item(player_data["title"] + " (Clean)", "no", clean_audio_url))
 
+        time.sleep(REQUEST_SLEEP)
+
     # --- Next page ---
     next_link = archive.select_one("a.pager")
     if pull_everything and next_link:
         archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"])
-        sleep(1)  # pause between pages
     else:
         archive_url = None
 
