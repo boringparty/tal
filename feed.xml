@@ -7,72 +7,24 @@
 	<copyright>Copyright © Ira Glass / This American Life</copyright>
 	<image></image>
 	<item>
-		<title>233: Starting From Scratch</title>
-		<link>https://www.thisamericanlife.org/233/starting-from-scratch</link>
-		<itunes:episode>233</itunes:episode>
-		<itunes:episodeType>full</itunes:episodeType>
-		<itunes:explicit>yes</itunes:explicit>
-		<description>A man in retirement tries to start over in a new life with a new venture: a cable channel, with lots of puppies.</description>
-		<pubDate>Fri, 07 Mar 2003 00:00:00 +0000</pubDate>
-		<enclosure url="https://dcs-spotify.megaphone.fm/NPR4591929511.mp3" type="audio/mpeg"/>
-	</item>
-	<item>
-		<title>864: Chicago Hope</title>
-		<link>https://www.thisamericanlife.org/864/chicago-hope</link>
-		<itunes:episode>864</itunes:episode>
-		<itunes:episodeType>full</itunes:episodeType>
-		<itunes:explicit>yes</itunes:explicit>
-		<description>The story of the most commonly performed surgery, and what goes terribly wrong with it.</description>
-		<pubDate>Fri, 18 Jul 2025 00:00:00 +0000</pubDate>
-		<enclosure url="https://dcs-spotify.megaphone.fm/NPR3974539898.mp3" type="audio/mpeg"/>
-	</item>
-	<item>
-		<title>864: Chicago Hope (Clean)</title>
-		<link>https://www.thisamericanlife.org/864/chicago-hope</link>
-		<itunes:episode>864</itunes:episode>
-		<itunes:episodeType>full</itunes:episodeType>
-		<itunes:explicit>no</itunes:explicit>
-		<description>The story of the most commonly performed surgery, and what goes terribly wrong with it.</description>
-		<pubDate>Fri, 18 Jul 2025 00:00:00 +0000</pubDate>
-		<enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/864.mp3" type="audio/mpeg"/>
-	</item>
-	<item>
-		<title>865: The Other Territory</title>
-		<link>https://www.thisamericanlife.org/865/the-other-territory</link>
-		<itunes:episode>865</itunes:episode>
-		<itunes:episodeType>full</itunes:episodeType>
-		<itunes:explicit>yes</itunes:explicit>
-		<description>Since October 7, Israel has intensified restrictions on West Bank Palestinians while global attention focused on Gaza. We travel to the West Bank to see these changes in person.</description>
-		<pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
-		<enclosure url="https://dcs-spotify.megaphone.fm/NPR3210182538.mp3" type="audio/mpeg"/>
-	</item>
-	<item>
-		<title>865: The Other Territory (Clean)</title>
-		<link>https://www.thisamericanlife.org/865/the-other-territory</link>
-		<itunes:episode>865</itunes:episode>
-		<itunes:episodeType>full</itunes:episodeType>
-		<itunes:explicit>no</itunes:explicit>
-		<description>Since October 7, Israel has intensified restrictions on West Bank Palestinians while global attention focused on Gaza. We travel to the West Bank to see these changes in person.</description>
-		<pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
-		<enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/865.mp3" type="audio/mpeg"/>
-	</item>
-	<item>
-		<title>866: Watch Out for That Tree</title>
-		<link>https://www.thisamericanlife.org/866/watch-out-for-that-tree</link>
-		<itunes:episode>866</itunes:episode>
-		<itunes:episodeType>full</itunes:episodeType>
-		<itunes:explicit>yes</itunes:explicit>
-		<description>Small human plans that run into much larger obstacles.</description>
-		<pubDate>Fri, 05 Sep 2025 00:00:00 +0000</pubDate>
-		<enclosure url="https://dcs-spotify.megaphone.fm/NPR5310093493.mp3" type="audio/mpeg"/>
-	</item>
-	<item>
 		<title>867: College Disorientation</title>
 		<link>https://www.thisamericanlife.org/867/college-disorientation</link>
 		<itunes:episode>867</itunes:episode>
 		<itunes:episodeType>full</itunes:episodeType>
 		<itunes:explicit>yes</itunes:explicit>
-		<description>Things are different on college campuses this year. We see inside the drama, with students and staff.</description>
+		<description>Things are different on college campuses this year. We see inside the drama, with students and staff.
+
+Prologue: Prologue
+
+We go to orientation at Arizona State University and meet international students who are trying to make friends. (6 minutes)
+
+Act One: My Black President
+
+The president of the Black Student Union at the University of Utah fights to keep the B in BSU. (30 minutes)
+
+Act Two: The Art of the Deal
+
+A definition of antisemitism, canceled classes, and angry professors at Columbia University. (16 minutes)</description>
 		<pubDate>Fri, 12 Sep 2025 00:00:00 +0000</pubDate>
 		<enclosure url="https://dcs-spotify.megaphone.fm/NPR2581159385.mp3" type="audio/mpeg"/>
 	</item>
@@ -82,8 +34,176 @@
 		<itunes:episode>867</itunes:episode>
 		<itunes:episodeType>full</itunes:episodeType>
 		<itunes:explicit>no</itunes:explicit>
-		<description>Things are different on college campuses this year. We see inside the drama, with students and staff.</description>
+		<description>Things are different on college campuses this year. We see inside the drama, with students and staff.
+
+Prologue: Prologue
+
+We go to orientation at Arizona State University and meet international students who are trying to make friends. (6 minutes)
+
+Act One: My Black President
+
+The president of the Black Student Union at the University of Utah fights to keep the B in BSU. (30 minutes)
+
+Act Two: The Art of the Deal
+
+A definition of antisemitism, canceled classes, and angry professors at Columbia University. (16 minutes)</description>
 		<pubDate>Fri, 12 Sep 2025 00:00:00 +0000</pubDate>
 		<enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/867.mp3" type="audio/mpeg"/>
+	</item>
+	<item>
+		<title>866: Watch Out for That Tree</title>
+		<link>https://www.thisamericanlife.org/866/watch-out-for-that-tree</link>
+		<itunes:episode>866</itunes:episode>
+		<itunes:episodeType>full</itunes:episodeType>
+		<itunes:explicit>yes</itunes:explicit>
+		<description>Small human plans that run into much larger obstacles.
+
+Prologue: Prologue
+
+Angela's dad, an accountant, made a spreadsheet to prepare for their family trip to a national park. But there are things you never think to put in a spreadsheet. (7 minutes)
+
+Act One: Forces Outside Our Control
+
+A young couple, excited to start a new chapter in their lives, is suddenly put on a very different trajectory. (30 minutes)
+
+Act Two: The Engineer
+
+A sixteen-year-old plans out a prank, and a complete stranger from Honduras ends up in a million-dollar deal. What could go wrong? (25 minutes)</description>
+		<pubDate>Fri, 05 Sep 2025 00:00:00 +0000</pubDate>
+		<enclosure url="https://dcs-spotify.megaphone.fm/NPR5310093493.mp3" type="audio/mpeg"/>
+	</item>
+	<item>
+		<title>865: The Other Territory</title>
+		<link>https://www.thisamericanlife.org/865/the-other-territory</link>
+		<itunes:episode>865</itunes:episode>
+		<itunes:episodeType>full</itunes:episodeType>
+		<itunes:explicit>yes</itunes:explicit>
+		<description>Since October 7, Israel has intensified restrictions on West Bank Palestinians while global attention focused on Gaza. We travel to the West Bank to see these changes in person.
+
+Prologue: Prologue
+
+Ira joins Hamed on his Monday commute. He has to navigate a constantly changing series of checkpoints and roadblocks to get to work each day. Hamed works for Comet-ME, which sets up solar panels, water systems, and security cameras in small villages all over the West Bank. (13 minutes)
+
+Act One: Ali and the Duster
+
+Settler violence has worsened significantly in the West Bank since October 7, 2023. Yael Even Or travels to a tiny village called Tuba, surrounded by Israeli settlements, to meet the 27-year-old resident trying to protect it. (26 minutes)
+
+Two quick snapshots of life in the West Bank since October 7th. (6 minutes)
+
+Act Two: What Happened to Walid
+
+After October 7th, Israeli Minister of Security Itamar Ben-Gvir increased restrictions on Palestinian prisoners in Israeli security prisons. Prisoners started dying. Dana Chivvis looks into one of those deaths. (25 minutes)</description>
+		<pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+		<enclosure url="https://dcs-spotify.megaphone.fm/NPR3210182538.mp3" type="audio/mpeg"/>
+	</item>
+	<item>
+		<title>865: The Other Territory (Clean)</title>
+		<link>https://www.thisamericanlife.org/865/the-other-territory</link>
+		<itunes:episode>865</itunes:episode>
+		<itunes:episodeType>full</itunes:episodeType>
+		<itunes:explicit>no</itunes:explicit>
+		<description>Since October 7, Israel has intensified restrictions on West Bank Palestinians while global attention focused on Gaza. We travel to the West Bank to see these changes in person.
+
+Prologue: Prologue
+
+Ira joins Hamed on his Monday commute. He has to navigate a constantly changing series of checkpoints and roadblocks to get to work each day. Hamed works for Comet-ME, which sets up solar panels, water systems, and security cameras in small villages all over the West Bank. (13 minutes)
+
+Act One: Ali and the Duster
+
+Settler violence has worsened significantly in the West Bank since October 7, 2023. Yael Even Or travels to a tiny village called Tuba, surrounded by Israeli settlements, to meet the 27-year-old resident trying to protect it. (26 minutes)
+
+Two quick snapshots of life in the West Bank since October 7th. (6 minutes)
+
+Act Two: What Happened to Walid
+
+After October 7th, Israeli Minister of Security Itamar Ben-Gvir increased restrictions on Palestinian prisoners in Israeli security prisons. Prisoners started dying. Dana Chivvis looks into one of those deaths. (25 minutes)</description>
+		<pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+		<enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/865.mp3" type="audio/mpeg"/>
+	</item>
+	<item>
+		<title>864: Chicago Hope</title>
+		<link>https://www.thisamericanlife.org/864/chicago-hope</link>
+		<itunes:episode>864</itunes:episode>
+		<itunes:episodeType>full</itunes:episodeType>
+		<itunes:explicit>yes</itunes:explicit>
+		<description>The story of the most commonly performed surgery, and what goes terribly wrong with it.
+
+Prologue: Prologue
+
+Ira Glass introduces the first episode of an inventive new podcast from longtime This American Life producer and editor Susan Burton.
+
+Act One: Act One
+
+Susan Burton introduces Mindy, a labor and delivery nurse at UI Health at the University of Illinois at Chicago. (5 minutes)
+
+Act Two: Act Two
+
+Another labor and delivery nurse at UI Health, Clara, gets ready to deliver twins at her own hospital and receives an epidural. (19 minutes)
+
+Act Three: Act Three
+
+Clara’s anesthesia is not working. She is now in the middle of major abdominal surgery, and she can feel that surgery. (21 minutes)
+
+Act Four: Act Four
+
+Heather, the head of obstetric anesthesia at UI Health, gets up onstage and asks a ballroom full of hundreds of anesthesiologists to wrestle with the question of why patients are feeling pain during C-sections, and what they can do to solve it. (8 minutes)</description>
+		<pubDate>Fri, 18 Jul 2025 00:00:00 +0000</pubDate>
+		<enclosure url="https://dcs-spotify.megaphone.fm/NPR3974539898.mp3" type="audio/mpeg"/>
+	</item>
+	<item>
+		<title>864: Chicago Hope (Clean)</title>
+		<link>https://www.thisamericanlife.org/864/chicago-hope</link>
+		<itunes:episode>864</itunes:episode>
+		<itunes:episodeType>full</itunes:episodeType>
+		<itunes:explicit>no</itunes:explicit>
+		<description>The story of the most commonly performed surgery, and what goes terribly wrong with it.
+
+Prologue: Prologue
+
+Ira Glass introduces the first episode of an inventive new podcast from longtime This American Life producer and editor Susan Burton.
+
+Act One: Act One
+
+Susan Burton introduces Mindy, a labor and delivery nurse at UI Health at the University of Illinois at Chicago. (5 minutes)
+
+Act Two: Act Two
+
+Another labor and delivery nurse at UI Health, Clara, gets ready to deliver twins at her own hospital and receives an epidural. (19 minutes)
+
+Act Three: Act Three
+
+Clara’s anesthesia is not working. She is now in the middle of major abdominal surgery, and she can feel that surgery. (21 minutes)
+
+Act Four: Act Four
+
+Heather, the head of obstetric anesthesia at UI Health, gets up onstage and asks a ballroom full of hundreds of anesthesiologists to wrestle with the question of why patients are feeling pain during C-sections, and what they can do to solve it. (8 minutes)</description>
+		<pubDate>Fri, 18 Jul 2025 00:00:00 +0000</pubDate>
+		<enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/864.mp3" type="audio/mpeg"/>
+	</item>
+	<item>
+		<title>233: Starting From Scratch</title>
+		<link>https://www.thisamericanlife.org/233/starting-from-scratch</link>
+		<itunes:episode>233</itunes:episode>
+		<itunes:episodeType>full</itunes:episodeType>
+		<itunes:explicit>yes</itunes:explicit>
+		<description>A man in retirement tries to start over in a new life with a new venture: a cable channel, with lots of puppies.
+
+Prologue: Prologue
+
+Host Ira Glass talks to Jorge Just, who thought he'd started over successfully. He'd moved to New York, found an apartment that everyone told him was a great deal, things were looking good. Then a reality television show visited his building. (8 minutes)
+
+Act One: Puppy Love, the Business Model
+
+Molly FitzSimons tells the story of her father starting over. After 25 years in the same zip code, as an executive in the same company, he moved to Los Angeles and tried to start over in a new life with a new venture: A cable channel, with no people, no talking, no plots, but lots and lots of puppies. (15 minutes)
+
+Act Two: Making Money The Old Fashioned Way
+
+Mary Beth Kirchner documents one day in the life of a hustler named Joe, who wakes up every morning broke, hustles as much as $10,000 during the day and then loses most of it by the time he goes to bed. What it's like to start from scratch every day of your life. (18 minutes)
+
+Act Three: The First Starting From Scratch
+
+Jonathan Goldstein reads a story about the first people to ever start from scratch, a couple named Adam and Eve. (14 minutes)</description>
+		<pubDate>Fri, 07 Mar 2003 00:00:00 +0000</pubDate>
+		<enclosure url="https://dcs-spotify.megaphone.fm/NPR4591929511.mp3" type="audio/mpeg"/>
 	</item>
 </rss>
