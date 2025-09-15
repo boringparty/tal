@@ -15,10 +15,10 @@ pull_new_only = MODE == "new_only"
 
 # --- LOAD FEED ---
 if pull_new_only and os.path.exists("feed.xml"):
-    with open("feed.xml", "r") as f:
+    with open("feed.xml", "r", encoding="utf-8") as f:
         feed = BeautifulSoup(f.read(), "xml")
 else:
-    with open("base.xml", "r") as f:
+    with open("base.xml", "r", encoding="utf-8") as f:
         feed = BeautifulSoup(f.read(), "xml")
 
 channel = feed.find("channel")
@@ -49,8 +49,8 @@ while archive_url:
             break
 
         full_url = urljoin("https://www.thisamericanlife.org", episode_link["href"])
-        episode_slug = full_url.rstrip("/").split("/")[-1]
-        print(f"Scraping episode {episode_slug}")
+        ep_slug = full_url.rstrip("/").split("/")[-1]
+        print(f"Scraping episode {ep_slug}")
 
         r_episode = session.get(full_url)
         episode = BeautifulSoup(r_episode.content, "html.parser")
@@ -64,7 +64,7 @@ while archive_url:
             except Exception:
                 pass
 
-        # Skip old episodes if mode is new_only
+        # --- Playlist / audio ---
         title_meta = episode.select_one("script#playlist-data")
         if not title_meta:
             continue
@@ -78,7 +78,7 @@ while archive_url:
             if episode_date and episode_date.date() < yesterday.date():
                 continue
 
-        # --- Audio ---
+        # --- Audio URLs ---
         audio_url = player_data["audio"]
         final_url = session.head(audio_url, allow_redirects=True).url
         parsed = urlparse(final_url)
@@ -87,7 +87,31 @@ while archive_url:
         if "/promos/" in clean_url:
             player_data["title"] += " (Promo)"
 
-        # --- Build item function ---
+        # --- Build full description ---
+        desc_parts = []
+        meta_desc = episode.select_one("meta[name='description']")
+        if meta_desc:
+            desc_parts.append(meta_desc["content"].strip())
+
+        for act in episode.select("article.node-act"):
+            act_label_tag = act.select_one(".field-name-field-act-label .field-item")
+            act_title_tag = act.select_one(".act-header a.goto-act")
+            act_desc_tag = act.select_one(".field-name-body .field-item p")
+
+            act_label = act_label_tag.text.strip() if act_label_tag else ""
+            act_title = act_title_tag.text.strip() if act_title_tag else ""
+            act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
+
+            if act_label and act_title:
+                desc_parts.append(f"{act_label}: {act_title}")
+            elif act_label:
+                desc_parts.append(act_label)
+            if act_desc:
+                desc_parts.append(act_desc)
+
+        full_description = "\n\n".join(desc_parts)
+
+        # --- Function to make item ---
         def make_item(title_text, explicit_val, audio_link):
             item_tag = feed.new_tag("item")
 
@@ -111,9 +135,8 @@ while archive_url:
             explicit_tag.string = explicit_val
             item_tag.append(explicit_tag)
 
-            desc_meta = episode.select_one("meta[name='description']")
             desc_tag = feed.new_tag("description")
-            desc_tag.string = desc_meta["content"].strip() if desc_meta else ""
+            desc_tag.string = full_description
             item_tag.append(desc_tag)
 
             pub_date_tag = feed.new_tag("pubDate")
@@ -132,7 +155,7 @@ while archive_url:
         existing_episodes.add(ep_num)
         count += 1
 
-        # --- Check for clean version ---
+        # Append clean version if present
         clean_link_tag = episode.select_one('a[href*="clean"]')
         if clean_link_tag:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
@@ -145,9 +168,9 @@ while archive_url:
     else:
         archive_url = None
 
-# --- Sort items numerically ---
+# --- Sort items: latest first ---
 items = channel.find_all("item")
-items_sorted = sorted(items, key=lambda x: int(x.find("itunes:episode").text.strip()))
+items_sorted = sorted(items, key=lambda x: int(x.find("itunes:episode").text.strip()), reverse=True)
 for item in items:
     item.extract()
 for item in items_sorted:
