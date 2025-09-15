@@ -4,7 +4,12 @@ permissions:
   contents: write
 
 on:
-  workflow_dispatch:   # manual trigger
+  workflow_dispatch:
+    inputs:
+      MODE:
+        description: "Scraper mode: test5 | all | new_only"
+        required: false
+        default: "test5"
   schedule:
     - cron: "0 18 * * 0"   # Sundays 6pm UTC
 
@@ -25,6 +30,8 @@ jobs:
 
       - name: Run scraper
         run: python generate.py
+        env:
+          SCRAPER_MODE: ${{ github.event.inputs.MODE }}
 
       - name: Commit & push if changed
         run: |
