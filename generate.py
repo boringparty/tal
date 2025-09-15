@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 
+import os
 import json
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION ---
-# Modes: "all" | "test5" | "new_only"
-MODE = "test5"
-
+MODE = os.getenv("SCRAPER_MODE", "test5")  # "test5" | "all" | "new_only"
 MAX_EPISODES = 5 if MODE == "test5" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
@@ -38,8 +37,8 @@ while archive_url:
             break
 
         full_url = urljoin("https://www.thisamericanlife.org", episode_link["href"])
-        episode_id = full_url.rstrip("/").split("/")[-1]
-        print(f"Scraping episode {episode_id}")
+        episode_slug = full_url.rstrip("/").split("/")[-1]
+        print(f"Scraping episode {episode_slug}")
 
         r_episode = session.get(full_url)
         episode = BeautifulSoup(r_episode.content, "html.parser")
@@ -68,36 +67,58 @@ while archive_url:
 
         audio_url = player_data["audio"]
         final_url = session.head(audio_url, allow_redirects=True).url
+        parsed = urlparse(final_url)
+        clean_url = urlunparse(parsed._replace(query=""))
 
-        if "/promos/" in final_url:
+        if "/promos/" in clean_url:
             player_data["title"] += " (Promo)"
 
         # --- Build RSS item ---
         item_tag = feed.new_tag("item")
 
+        # Title
         title_tag = feed.new_tag("title")
         title_tag.string = player_data["title"]
         item_tag.append(title_tag)
 
+        # Link
         link_tag = feed.new_tag("link")
         link_tag.string = full_url
         item_tag.append(link_tag)
 
+        # iTunes episode number (numeric)
+        if ":" in player_data["title"]:
+            episode_num = player_data["title"].split(":", 1)[0].strip()
+        else:
+            episode_num = episode_slug
         itunes_tag = feed.new_tag("itunes:episode")
-        itunes_tag.string = episode_id
+        itunes_tag.string = episode_num
         item_tag.append(itunes_tag)
 
+        # iTunes episodeType
+        ep_type_tag = feed.new_tag("itunes:episodeType")
+        ep_type_tag.string = "full"
+        item_tag.append(ep_type_tag)
+
+        # iTunes explicit
+        explicit_tag = feed.new_tag("itunes:explicit")
+        explicit_tag.string = "yes"
+        item_tag.append(explicit_tag)
+
+        # Description
         desc_meta = episode.select_one("meta[name='description']")
         desc_tag = feed.new_tag("description")
         desc_tag.string = desc_meta["content"] if desc_meta else ""
         item_tag.append(desc_tag)
 
+        # PubDate
         pub_date_tag = feed.new_tag("pubDate")
         pub_date_tag.string = episode_date.strftime("%a, %d %b %Y 00:00:00 +0000") if episode_date else ""
         item_tag.append(pub_date_tag)
 
+        # Enclosure
         enclosure_tag = feed.new_tag("enclosure")
-        enclosure_tag["url"] = final_url
+        enclosure_tag["url"] = clean_url
         enclosure_tag["type"] = "audio/mpeg"
         item_tag.append(enclosure_tag)
 
