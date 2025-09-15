@@ -74,6 +74,8 @@ while archive_url:
         if "audio" not in player_data:
             continue
         ep_num = player_data["title"].split(":", 1)[0].strip()
+
+        # Skip already-seen episodes in new_only
         if pull_new_only:
             if ep_num in existing_episodes:
                 continue
@@ -105,11 +107,12 @@ while archive_url:
             act_title = act_title_tag.text.strip() if act_title_tag else ""
             act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
 
-            # Avoid "Prologue: Prologue"
             if act_label.lower() == "prologue":
-                act_label_text = act_label
+                act_label_text = "Prologue"
                 if act_title and act_title.lower() != "prologue":
-                    act_label_text += f"\n{act_desc}" if act_desc else ""
+                    act_label_text += f": {act_title}"
+                if act_desc:
+                    act_label_text += f"\n{act_desc}"
             else:
                 act_label_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
                 if act_desc:
@@ -118,7 +121,7 @@ while archive_url:
             if act_label_text:
                 desc_parts.append(act_label_text)
 
-        full_description = "\n\n".join(desc_parts)
+        full_description = "\n".join(desc_parts)
 
         # --- Function to make item ---
         def make_item(title_text, explicit_val, audio_link):
@@ -187,6 +190,20 @@ for item in items:
 for item in items_sorted:
     channel.append(item)
 
+# --- Refresh header from base.xml ---
+with open("base.xml", "r", encoding="utf-8") as f:
+    base = BeautifulSoup(f.read(), "xml")
+base_channel = base.find("channel")
+
+# Replace channel metadata but keep items
+for tag in channel.find_all(recursive=False):
+    if tag.name == "item":
+        continue
+    tag.decompose()
+for tag in base_channel.find_all(recursive=False):
+    if tag.name != "item":
+        channel.insert(0, tag)
+
 # --- Pretty write function ---
 def write_pretty_feed(feed, filename="feed.xml"):
     with open(filename, "w", encoding="utf-8") as out:
@@ -199,7 +216,11 @@ def write_pretty_feed(feed, filename="feed.xml"):
         for tag in channel.find_all(recursive=False):
             if tag.name == "item":
                 continue
-            out.write(f'\t<{tag.name}>{tag.text.strip()}</{tag.name}>\n')
+            if tag.attrs:
+                attrs = " ".join([f'{k}="{v}"' for k, v in tag.attrs.items()])
+                out.write(f'\t<{tag.name} {attrs}>{tag.text.strip()}</{tag.name}>\n')
+            else:
+                out.write(f'\t<{tag.name}>{tag.text.strip()}</{tag.name}>\n')
 
         for item in channel.find_all("item"):
             out.write('\t<item>\n')
