@@ -4,70 +4,113 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from datetime import datetime, timedelta
 
-# Read base.xml
+# --- CONFIGURATION ---
+# Modes: "all" | "test5" | "new_only"
+MODE = "test5"
+
+MAX_EPISODES = 5 if MODE == "test5" else None
+pull_everything = MODE == "all"
+pull_new_only = MODE == "new_only"
+
+# --- SETUP ---
 with open("base.xml", "r") as f:
     feed = BeautifulSoup(f.read(), "xml")
 
 channel = feed.find("channel")
-
 archive_url = "https://www.thisamericanlife.org/archive"
 session = requests.Session()
 
+today = datetime.utcnow()
+yesterday = today - timedelta(days=1)
+
+# --- SCRAPING LOOP ---
 while archive_url:
     print(f"Fetching {archive_url}")
     r = session.get(archive_url)
     content = r.json()["html"] if "application/json" in r.headers.get("Content-Type", "") else r.content
     archive = BeautifulSoup(content, "html.parser")
 
+    count = 0
     for episode_link in archive.select("header > a.goto-episode"):
+        if MAX_EPISODES and count >= MAX_EPISODES:
+            break
+
         full_url = urljoin("https://www.thisamericanlife.org", episode_link["href"])
+        episode_id = full_url.rstrip("/").split("/")[-1]
+        print(f"Scraping episode {episode_id}")
+
         r_episode = session.get(full_url)
         episode = BeautifulSoup(r_episode.content, "html.parser")
 
-        # Grab audio data
+        # --- Episode date ---
+        date_span = episode.select_one("span.date-display-single")
+        if date_span:
+            try:
+                episode_date = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
+            except Exception:
+                episode_date = None
+        else:
+            episode_date = None
+
+        # Skip old episodes if mode is new_only
+        if pull_new_only and episode_date and episode_date.date() < yesterday.date():
+            continue
+
+        # --- Audio ---
         player_data_tag = episode.select_one("script#playlist-data")
         if not player_data_tag:
             continue
         player_data = json.loads(player_data_tag.string)
-
         if "audio" not in player_data:
             continue
 
-        if "/promos/" in player_data["audio"]:
+        audio_url = player_data["audio"]
+        final_url = session.head(audio_url, allow_redirects=True).url
+
+        if "/promos/" in final_url:
             player_data["title"] += " (Promo)"
 
-        # Build RSS item
+        # --- Build RSS item ---
+        item_tag = feed.new_tag("item")
+
         title_tag = feed.new_tag("title")
         title_tag.string = player_data["title"]
+        item_tag.append(title_tag)
 
         link_tag = feed.new_tag("link")
         link_tag.string = full_url
+        item_tag.append(link_tag)
 
-        pub_meta = episode.select_one("meta[property='article:published_time']")
-        pub_date_tag = feed.new_tag("pubDate")
-        pub_date_tag.string = pub_meta["content"] if pub_meta else ""
+        itunes_tag = feed.new_tag("itunes:episode")
+        itunes_tag.string = episode_id
+        item_tag.append(itunes_tag)
 
         desc_meta = episode.select_one("meta[name='description']")
         desc_tag = feed.new_tag("description")
         desc_tag.string = desc_meta["content"] if desc_meta else ""
-
-        enclosure_tag = feed.new_tag("enclosure")
-        enclosure_tag["url"] = player_data["audio"]
-        enclosure_tag["type"] = "audio/mpeg"
-
-        item_tag = feed.new_tag("item")
-        item_tag.append(title_tag)
-        item_tag.append(link_tag)
-        item_tag.append(enclosure_tag)
         item_tag.append(desc_tag)
+
+        pub_date_tag = feed.new_tag("pubDate")
+        pub_date_tag.string = episode_date.strftime("%a, %d %b %Y 00:00:00 +0000") if episode_date else ""
         item_tag.append(pub_date_tag)
 
+        enclosure_tag = feed.new_tag("enclosure")
+        enclosure_tag["url"] = final_url
+        enclosure_tag["type"] = "audio/mpeg"
+        item_tag.append(enclosure_tag)
+
         channel.append(item_tag)
+        count += 1
 
+    # --- Next page ---
     next_link = archive.select_one("a.pager")
-    archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if next_link else None
+    if pull_everything and next_link:
+        archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"])
+    else:
+        archive_url = None
 
-# Write updated feed.xml
+# --- Write feed.xml ---
 with open("feed.xml", "w") as out:
     out.write(feed.prettify())
