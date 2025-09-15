@@ -1,9 +1,12 @@
 name: Scrape TAL Archive
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:   # manual trigger
   schedule:
-    - cron: "0 6 * * 1"   # run every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"   # weekly run, 06:00 UTC
 
 jobs:
   scrape:
@@ -17,11 +20,87 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
+      - name: Install dependencies
         run: pip install requests beautifulsoup4 lxml
 
-      - name: Run scraper
-        run: python generate.py
+      - name: Run scraper (limited for testing)
+        run: |
+          cat <<'EOF' > generate.py
+          #!/usr/bin/env python3
+          import json
+          import requests
+          from bs4 import BeautifulSoup
+          from urllib.parse import urljoin
+
+          MAX_EPISODES = 5  # limit for testing
+
+          with open("base.xml", "r") as f:
+              feed = BeautifulSoup(f.read(), "xml")
+
+          channel = feed.find("channel")
+          archive_url = "https://www.thisamericanlife.org/archive"
+          session = requests.Session()
+
+          while archive_url:
+              print(f"Fetching {archive_url}")
+              r = session.get(archive_url)
+              content = r.json()["html"] if "application/json" in r.headers.get("Content-Type", "") else r.content
+              archive = BeautifulSoup(content, "html.parser")
+
+              count = 0
+              for episode_link in archive.select("header > a.goto-episode"):
+                  if count >= MAX_EPISODES:
+                      break
+                  full_url = urljoin("https://www.thisamericanlife.org", episode_link["href"])
+                  episode_id = full_url.rstrip("/").split("/")[-1]
+                  print(f"Scraping episode {episode_id}")
+                  r_episode = session.get(full_url)
+                  episode = BeautifulSoup(r_episode.content, "html.parser")
+
+                  player_data_tag = episode.select_one("script#playlist-data")
+                  if not player_data_tag:
+                      continue
+                  player_data = json.loads(player_data_tag.string)
+                  if "audio" not in player_data:
+                      continue
+                  if "/promos/" in player_data["audio"]:
+                      player_data["title"] += " (Promo)"
+
+                  title_tag = feed.new_tag("title")
+                  title_tag.string = player_data["title"]
+                  link_tag = feed.new_tag("link")
+                  link_tag.string = full_url
+
+                  pub_meta = episode.select_one("meta[property='article:published_time']")
+                  pub_date_tag = feed.new_tag("pubDate")
+                  pub_date_tag.string = pub_meta["content"] if pub_meta else ""
+
+                  desc_meta = episode.select_one("meta[name='description']")
+                  desc_tag = feed.new_tag("description")
+                  desc_tag.string = desc_meta["content"] if desc_meta else ""
+
+                  enclosure_tag = feed.new_tag("enclosure")
+                  enclosure_tag["url"] = player_data["audio"]
+                  enclosure_tag["type"] = "audio/mpeg"
+
+                  item_tag = feed.new_tag("item")
+                  item_tag.append(title_tag)
+                  item_tag.append(link_tag)
+                  item_tag.append(enclosure_tag)
+                  item_tag.append(desc_tag)
+                  item_tag.append(pub_date_tag)
+
+                  channel.append(item_tag)
+                  count += 1
+
+              # Stop after first page for testing
+              archive_url = None
+
+          with open("feed.xml", "w") as out:
+              out.write(feed.prettify())
+          EOF
+
+          python generate.py
 
       - name: Commit & push if changed
         run: |
@@ -29,4 +108,4 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add feed.xml
           git diff --quiet && git diff --staged --quiet || git commit -m "Update feed.xml"
-          git push
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
