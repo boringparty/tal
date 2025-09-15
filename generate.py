@@ -96,10 +96,11 @@ while archive_url:
             desc_parts.append(meta_desc["content"].strip())
 
         # Only include main episode acts, skip related episodes
-        for act in episode.select("article.node-act"):
-            if 'related' in act.get('class', []):
+        for container in episode.select("div.field-item.even, div.field-item.odd"):
+            act = container.find("article.node-act")
+            if not act:
                 continue
-
+                
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
             act_desc_tag = act.select_one(".field-name-body .field-item p")
