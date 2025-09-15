@@ -9,7 +9,7 @@ on:
       MODE:
         description: "Scraper mode: test5 | all | new_only"
         required: false
-        default: "test5"
+        default: "all"
   schedule:
     - cron: "0 18 * * 0"   # Sundays 6pm UTC
 
