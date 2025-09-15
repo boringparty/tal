@@ -92,20 +92,25 @@ while archive_url:
         meta_desc = episode.select_one("meta[name='description']")
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
-
         for act in episode.select("article.node-act"):
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
             act_desc_tag = act.select_one(".field-name-body .field-item p")
-
+        
             act_label = act_label_tag.text.strip() if act_label_tag else ""
             act_title = act_title_tag.text.strip() if act_title_tag else ""
             act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
-
-            if act_label and act_title:
-                desc_parts.append(f"{act_label}: {act_title}")
-            elif act_label:
-                desc_parts.append(act_label)
+        
+            # Avoid "Prologue: Prologue"
+            if act_label.lower() == "prologue":
+                act_label_text = act_label
+                if act_title and act_title.lower() != "prologue":
+                    act_label_text += f": {act_title}"
+            else:
+                act_label_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
+        
+            if act_label_text:
+                desc_parts.append(act_label_text)
             if act_desc:
                 desc_parts.append(act_desc)
 
