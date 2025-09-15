@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse
 from datetime import datetime, timedelta
-import time
+from time import sleep
 
 # --- CONFIGURATION ---
 MODE = os.getenv("SCRAPER_MODE", "test5")  # "test5" | "all" | "new_only"
@@ -41,7 +41,6 @@ yesterday = today - timedelta(days=1)
 while archive_url:
     print(f"Fetching {archive_url}")
     r = session.get(archive_url)
-    time.sleep(1)  # polite pause
     content = r.json()["html"] if "application/json" in r.headers.get("Content-Type", "") else r.content
     archive = BeautifulSoup(content, "html.parser")
 
@@ -55,7 +54,7 @@ while archive_url:
         print(f"Scraping episode {ep_slug}")
 
         r_episode = session.get(full_url)
-        time.sleep(1)  # polite pause
+        sleep(1)  # polite pause
         episode = BeautifulSoup(r_episode.content, "html.parser")
 
         # --- Episode date ---
@@ -95,15 +94,20 @@ while archive_url:
         meta_desc = episode.select_one("meta[name='description']")
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
+
+        # Only include main episode acts, skip related episodes
         for act in episode.select("article.node-act"):
+            if 'related' in act.get('class', []):
+                continue
+
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
             act_desc_tag = act.select_one(".field-name-body .field-item p")
-        
+            
             act_label = act_label_tag.text.strip() if act_label_tag else ""
             act_title = act_title_tag.text.strip() if act_title_tag else ""
             act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
-        
+            
             # Avoid "Prologue: Prologue"
             if act_label.lower() == "prologue":
                 act_label_text = act_label
@@ -111,7 +115,7 @@ while archive_url:
                     act_label_text += f": {act_title}"
             else:
                 act_label_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
-        
+            
             if act_label_text:
                 desc_parts.append(act_label_text)
             if act_desc:
@@ -173,6 +177,7 @@ while archive_url:
     next_link = archive.select_one("a.pager")
     if pull_everything and next_link:
         archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"])
+        sleep(1)  # pause between pages
     else:
         archive_url = None
 
