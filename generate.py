@@ -153,8 +153,31 @@ for item in items:
 for item in items_sorted:
     channel.append(item)
 
-# --- Write feed.xml with compact formatting ---
-with open("feed.xml", "w") as out:
-    xml_str = feed.prettify()
-    compact_xml = "\n".join([line.strip() for line in xml_str.splitlines() if line.strip()])
-    out.write(compact_xml)
+# --- Pretty write function ---
+def write_pretty_feed(feed, filename="feed.xml"):
+    with open(filename, "w", encoding="utf-8") as out:
+        out.write('<?xml version="1.0" encoding="utf-8"?>\n')
+        rss_tag = feed.find("rss")
+        attrs = " ".join([f'{k}="{v}"' for k, v in rss_tag.attrs.items()])
+        out.write(f'<rss {attrs}>\n')
+
+        channel = rss_tag.find("channel")
+        for tag in channel.find_all(recursive=False):
+            if tag.name == "item":
+                continue
+            out.write(f'\t<{tag.name}>{tag.text.strip()}</{tag.name}>\n')
+
+        for item in channel.find_all("item"):
+            out.write('\t<item>\n')
+            for child in item.find_all(recursive=False):
+                if child.name == "enclosure":
+                    attrs = " ".join([f'{k}="{v}"' for k, v in child.attrs.items()])
+                    out.write(f'\t\t<enclosure {attrs}/>\n')
+                else:
+                    out.write(f'\t\t<{child.name}>{child.text.strip()}</{child.name}>\n')
+            out.write('\t</item>\n')
+
+        out.write('</rss>\n')
+
+# --- Write feed ---
+write_pretty_feed(feed, "feed.xml")
