@@ -57,16 +57,14 @@ while archive_url:
 
         # --- Episode date ---
         date_span = episode.select_one("span.date-display-single")
+        episode_date = None
         if date_span:
             try:
                 episode_date = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
             except Exception:
-                episode_date = None
-        else:
-            episode_date = None
+                pass
 
         # Skip old episodes if mode is new_only
-        # Also skip if already in feed
         title_meta = episode.select_one("script#playlist-data")
         if not title_meta:
             continue
@@ -89,20 +87,20 @@ while archive_url:
         if "/promos/" in clean_url:
             player_data["title"] += " (Promo)"
 
-        # --- Build main item ---
+        # --- Build item function ---
         def make_item(title_text, explicit_val, audio_link):
             item_tag = feed.new_tag("item")
 
             title_tag = feed.new_tag("title")
-            title_tag.string = title_text
+            title_tag.string = title_text.strip()
             item_tag.append(title_tag)
 
             link_tag = feed.new_tag("link")
-            link_tag.string = full_url
+            link_tag.string = full_url.strip()
             item_tag.append(link_tag)
 
             itunes_tag = feed.new_tag("itunes:episode")
-            itunes_tag.string = ep_num
+            itunes_tag.string = ep_num.strip()
             item_tag.append(itunes_tag)
 
             ep_type_tag = feed.new_tag("itunes:episodeType")
@@ -115,7 +113,7 @@ while archive_url:
 
             desc_meta = episode.select_one("meta[name='description']")
             desc_tag = feed.new_tag("description")
-            desc_tag.string = desc_meta["content"] if desc_meta else ""
+            desc_tag.string = desc_meta["content"].strip() if desc_meta else ""
             item_tag.append(desc_tag)
 
             pub_date_tag = feed.new_tag("pubDate")
@@ -147,7 +145,16 @@ while archive_url:
     else:
         archive_url = None
 
-# --- Write feed.xml ---
+# --- Sort items numerically ---
+items = channel.find_all("item")
+items_sorted = sorted(items, key=lambda x: int(x.find("itunes:episode").text.strip()))
+for item in items:
+    item.extract()
+for item in items_sorted:
+    channel.append(item)
+
+# --- Write feed.xml with compact formatting ---
 with open("feed.xml", "w") as out:
-    # compact formatting: one tag per line
-    out.write(feed.prettify(formatter=None).replace("\n  ", ""))
+    xml_str = feed.prettify()
+    compact_xml = "\n".join([line.strip() for line in xml_str.splitlines() if line.strip()])
+    out.write(compact_xml)
