@@ -213,6 +213,7 @@ def write_pretty_feed(feed, filename="feed.xml"):
         out.write(f'<rss {attrs}>\n')
 
         channel = rss_tag.find("channel")
+        # Write channel children except <item>
         for tag in channel.find_all(recursive=False):
             if tag.name == "item":
                 continue
@@ -222,6 +223,7 @@ def write_pretty_feed(feed, filename="feed.xml"):
             else:
                 out.write(f'\t<{tag.name}>{tag.text.strip()}</{tag.name}>\n')
 
+        # Write <item>s
         for item in channel.find_all("item"):
             out.write('\t<item>\n')
             for child in item.find_all(recursive=False):
