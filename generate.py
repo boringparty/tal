@@ -22,7 +22,11 @@ with open(feed_file, "r", encoding="utf-8") as f:
 
 channel = feed.find("channel")
 if not channel:
-    raise ValueError(f"No <channel> found in {feed_file}")
+    print(f"[WARNING] {feed_file} missing <channel>, falling back to base.xml")
+    with open("base.xml", "r", encoding="utf-8") as f:
+        feed = BeautifulSoup(f.read(), "xml")
+    channel = feed.find("channel")
+
 
 # Update the header from base.xml every run
 with open("base.xml", "r", encoding="utf-8") as f:
