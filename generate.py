@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse
 from datetime import datetime, timedelta
 import time
+import copy
 
 # --- CONFIGURATION ---
 MODE = os.getenv("SCRAPER_MODE", "test5")  # "test5" | "all" | "new_only"
@@ -115,15 +116,14 @@ while archive_url:
             if act_text:
                 desc_parts.append(act_text)
 
-        full_description = "\n\n".join(desc_parts)  # double newlines
+        full_description = "\n\n".join(desc_parts)
 
         # --- Function to make item ---
         def make_item(title_text, explicit_val, audio_link):
             item_tag = feed.new_tag("item")
-
-            title_tag = feed.new_tag("title")
-            title_tag.string = title_text.strip()
-            item_tag.append(title_tag)
+            t = feed.new_tag("title")
+            t.string = title_text.strip()
+            item_tag.append(t)
 
             link_tag = feed.new_tag("link")
             link_tag.string = full_url.strip()
@@ -156,6 +156,7 @@ while archive_url:
 
             return item_tag
 
+        # Append main episode
         channel.append(make_item(player_data["title"], "yes", clean_url))
         existing_episodes.add(ep_num)
         count += 1
@@ -183,19 +184,23 @@ for item in items:
 for item in items_sorted:
     channel.append(item)
 
-# --- Refresh header from base.xml ---
+# --- Refresh header from base.xml without touching base ---
 with open("base.xml", "r", encoding="utf-8") as f:
     base = BeautifulSoup(f.read(), "xml")
 base_channel = base.find("channel")
 
-# Replace channel metadata but keep items
-for tag in channel.find_all(recursive=False):
-    if tag.name == "item":
-        continue
-    tag.decompose()
-for tag in base_channel.find_all(recursive=False):
-    if tag.name != "item":
-        channel.insert(0, tag)
+# Replace metadata tags but keep items
+metadata_tags = ["title", "link", "description", "language", "copyright", "itunes:image"]
+for tag_name in metadata_tags:
+    base_tag = base_channel.find(tag_name)
+    if base_tag:
+        existing_tag = channel.find(tag_name)
+        if existing_tag:
+            existing_tag.string = base_tag.string
+            for attr, val in base_tag.attrs.items():
+                existing_tag[attr] = val
+        else:
+            channel.insert(0, copy.copy(base_tag))  # copy so base isn't modified
 
 # --- Pretty write function ---
 def write_pretty_feed(feed, filename="feed.xml"):
