@@ -184,19 +184,21 @@ for item in items:
 for item in items_sorted:
     channel.append(item)
 
-# --- Refresh header from base.xml without touching base ---
+# --- Refresh header from base.xml (safe for itunes:image) ---
 with open("base.xml", "r", encoding="utf-8") as f:
     base = BeautifulSoup(f.read(), "xml")
 base_channel = base.find("channel")
 
-# Replace metadata tags but keep items
 metadata_tags = ["title", "link", "description", "language", "copyright", "itunes:image"]
 for tag_name in metadata_tags:
     base_tag = base_channel.find(tag_name)
     if base_tag:
         existing_tag = channel.find(tag_name)
         if existing_tag:
-            existing_tag.string = base_tag.string
+            # Only copy string if it exists
+            if base_tag.string is not None:
+                existing_tag.string = base_tag.string
+            # Copy attributes
             for attr, val in base_tag.attrs.items():
                 existing_tag[attr] = val
         else:
