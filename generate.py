@@ -16,14 +16,13 @@ pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1  # seconds between episode requests
 
 # --- LOAD FEED ---
-if pull_new_only and os.path.exists("feed.xml"):
-    with open("feed.xml", "r", encoding="utf-8") as f:
-        feed = BeautifulSoup(f.read(), "xml")
-else:
-    with open("base.xml", "r", encoding="utf-8") as f:
-        feed = BeautifulSoup(f.read(), "xml")
+feed_file = "feed.xml" if pull_new_only and os.path.exists("feed.xml") else "base.xml"
+with open(feed_file, "r", encoding="utf-8") as f:
+    feed = BeautifulSoup(f.read(), "xml")
 
 channel = feed.find("channel")
+if not channel:
+    raise ValueError(f"No <channel> found in {feed_file}")
 
 # Track existing episodes
 existing_episodes = set()
@@ -97,7 +96,6 @@ while archive_url:
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
 
-        # Only select acts inside the main episode container
         for act in episode.select("div.field-items > div.field-item > article.node-act"):
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
@@ -108,20 +106,16 @@ while archive_url:
             act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
 
             if act_label.lower() == "prologue":
-                act_label_text = "Prologue"
-                if act_title and act_title.lower() != "prologue":
-                    act_label_text += f": {act_title}"
-                if act_desc:
-                    act_label_text += f"\n{act_desc}"
+                act_text = f"{act_label}\n{act_desc}" if act_desc else act_label
             else:
-                act_label_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
+                act_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
                 if act_desc:
-                    act_label_text += f"\n{act_desc}"
+                    act_text += f"\n{act_desc}"
 
-            if act_label_text:
-                desc_parts.append(act_label_text)
+            if act_text:
+                desc_parts.append(act_text)
 
-        full_description = "\n".join(desc_parts)
+        full_description = "\n\n".join(desc_parts)  # double newlines
 
         # --- Function to make item ---
         def make_item(title_text, explicit_val, audio_link):
@@ -162,12 +156,11 @@ while archive_url:
 
             return item_tag
 
-        # Append main episode
         channel.append(make_item(player_data["title"], "yes", clean_url))
         existing_episodes.add(ep_num)
         count += 1
 
-        # Append clean version if present
+        # Clean version if present
         clean_link_tag = episode.select_one('a[href*="clean"]')
         if clean_link_tag:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
