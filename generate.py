@@ -16,30 +16,14 @@ pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1  # seconds between episode requests
 
 # --- LOAD FEED ---
-feed_file = "feed.xml" if pull_new_only and os.path.exists("feed.xml") else "base.xml"
-with open(feed_file, "r", encoding="utf-8") as f:
-    feed = BeautifulSoup(f.read(), "xml")
-
-channel = feed.find("channel")
-if not channel:
-    print(f"[WARNING] {feed_file} missing <channel>, falling back to base.xml")
+if pull_new_only and os.path.exists("feed.xml"):
+    with open("feed.xml", "r", encoding="utf-8") as f:
+        feed = BeautifulSoup(f.read(), "xml")
+else:
     with open("base.xml", "r", encoding="utf-8") as f:
         feed = BeautifulSoup(f.read(), "xml")
-    channel = feed.find("channel")
 
-
-# Update the header from base.xml every run
-with open("base.xml", "r", encoding="utf-8") as f:
-    base_feed = BeautifulSoup(f.read(), "xml")
-base_channel = base_feed.find("channel")
-for tag_name in ["title", "link", "description", "language", "copyright", "itunes:image"]:
-    base_tag = base_channel.find(tag_name)
-    if base_tag:
-        existing_tag = channel.find(tag_name)
-        if existing_tag:
-            existing_tag.replace_with(base_tag)
-        else:
-            channel.append(base_tag)
+channel = feed.find("channel")
 
 # Track existing episodes
 existing_episodes = set()
@@ -90,6 +74,8 @@ while archive_url:
         if "audio" not in player_data:
             continue
         ep_num = player_data["title"].split(":", 1)[0].strip()
+
+        # Skip already-seen episodes in new_only
         if pull_new_only:
             if ep_num in existing_episodes:
                 continue
@@ -111,7 +97,7 @@ while archive_url:
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
 
-        # Acts inside the episode
+        # Only select acts inside the main episode container
         for act in episode.select("div.field-items > div.field-item > article.node-act"):
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
@@ -121,25 +107,29 @@ while archive_url:
             act_title = act_title_tag.text.strip() if act_title_tag else ""
             act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
 
-            # Avoid "Prologue: Prologue" and add blank line after meta desc
             if act_label.lower() == "prologue":
-                act_text = f"{act_label}\n{act_desc}" if act_desc else act_label
-            else:
-                act_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
+                act_label_text = "Prologue"
+                if act_title and act_title.lower() != "prologue":
+                    act_label_text += f": {act_title}"
                 if act_desc:
-                    act_text += f"\n{act_desc}"
+                    act_label_text += f"\n{act_desc}"
+            else:
+                act_label_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
+                if act_desc:
+                    act_label_text += f"\n{act_desc}"
 
-            if act_text:
-                desc_parts.append(act_text)
+            if act_label_text:
+                desc_parts.append(act_label_text)
 
-        full_description = "\n\n".join(desc_parts)
+        full_description = "\n".join(desc_parts)
 
         # --- Function to make item ---
         def make_item(title_text, explicit_val, audio_link):
             item_tag = feed.new_tag("item")
-            feed_title = feed.new_tag("title")
-            feed_title.string = title_text.strip()
-            item_tag.append(feed_title)
+
+            title_tag = feed.new_tag("title")
+            title_tag.string = title_text.strip()
+            item_tag.append(title_tag)
 
             link_tag = feed.new_tag("link")
             link_tag.string = full_url.strip()
@@ -172,11 +162,12 @@ while archive_url:
 
             return item_tag
 
+        # Append main episode
         channel.append(make_item(player_data["title"], "yes", clean_url))
         existing_episodes.add(ep_num)
         count += 1
 
-        # Clean version if available
+        # Append clean version if present
         clean_link_tag = episode.select_one('a[href*="clean"]')
         if clean_link_tag:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
@@ -199,6 +190,20 @@ for item in items:
 for item in items_sorted:
     channel.append(item)
 
+# --- Refresh header from base.xml ---
+with open("base.xml", "r", encoding="utf-8") as f:
+    base = BeautifulSoup(f.read(), "xml")
+base_channel = base.find("channel")
+
+# Replace channel metadata but keep items
+for tag in channel.find_all(recursive=False):
+    if tag.name == "item":
+        continue
+    tag.decompose()
+for tag in base_channel.find_all(recursive=False):
+    if tag.name != "item":
+        channel.insert(0, tag)
+
 # --- Pretty write function ---
 def write_pretty_feed(feed, filename="feed.xml"):
     with open(filename, "w", encoding="utf-8") as out:
@@ -211,7 +216,11 @@ def write_pretty_feed(feed, filename="feed.xml"):
         for tag in channel.find_all(recursive=False):
             if tag.name == "item":
                 continue
-            out.write(f'\t<{tag.name}>{tag.text.strip()}</{tag.name}>\n')
+            if tag.attrs:
+                attrs = " ".join([f'{k}="{v}"' for k, v in tag.attrs.items()])
+                out.write(f'\t<{tag.name} {attrs}>{tag.text.strip()}</{tag.name}>\n')
+            else:
+                out.write(f'\t<{tag.name}>{tag.text.strip()}</{tag.name}>\n')
 
         for item in channel.find_all("item"):
             out.write('\t<item>\n')
@@ -225,4 +234,5 @@ def write_pretty_feed(feed, filename="feed.xml"):
 
         out.write('</rss>\n')
 
+# --- Write feed ---
 write_pretty_feed(feed, "feed.xml")
