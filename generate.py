@@ -10,7 +10,7 @@ import time
 
 # --- CONFIGURATION ---
 MODE = os.getenv("SCRAPER_MODE", "test5")  # test5 | all | new_only
-MAX_EPISODES = 10 if MODE == "test5" else None
+MAX_EPISODES = 5 if MODE == "test5" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1
@@ -33,8 +33,7 @@ BASE_FOOTER = """
 
 FEED_FILE = "feed.xml"
 items_html = ""
-scrape_date = datetime.utcnow()
-scrape_pubdate_str = scrape_date.strftime("%a, %d %b %Y 00:00:00 +0000")
+prev_ep_num = 0  # for repeat detection
 
 # --- LOAD EXISTING EPISODES ---
 existing_episodes = {}
@@ -49,9 +48,10 @@ if pull_new_only and os.path.exists(FEED_FILE):
 # --- SETUP ---
 archive_url = "https://www.thisamericanlife.org/archive"
 session = requests.Session()
+scrape_date = datetime.utcnow()
+scrape_pubdate_str = scrape_date.strftime("%a, %d %b %Y 00:00:00 +0000")
 
 # --- SCRAPING LOOP ---
-seen_ep_nums = set()
 while archive_url:
     print(f"Fetching {archive_url}")
     r = session.get(archive_url)
@@ -59,8 +59,6 @@ while archive_url:
     archive = BeautifulSoup(content, "html.parser")
 
     count = 0
-    episodes_to_add = []  # collect this page's episodes to maintain newest-first order
-
     for episode_link in archive.select("header > a.goto-episode"):
         if MAX_EPISODES and count >= MAX_EPISODES:
             break
@@ -109,8 +107,7 @@ while archive_url:
         has_clean = bool(clean_link_tag)
 
         # --- Repeat detection ---
-        is_repeat = ep_num in seen_ep_nums
-        seen_ep_nums.add(ep_num)
+        is_repeat = ep_num < prev_ep_num
 
         title_parts = []
         if has_clean:
@@ -169,7 +166,9 @@ while archive_url:
       <enclosure url="{clean_url}" type="audio/mpeg"/>
     </item>
 """
-        episodes_to_add.append(item_block)
+        items_html = item_block + items_html
+        prev_ep_num = ep_num
+        count += 1
 
         # Optional clean version
         if has_clean:
@@ -186,13 +185,9 @@ while archive_url:
       <enclosure url="{clean_audio_url}" type="audio/mpeg"/>
     </item>
 """
-            episodes_to_add.append(clean_item_block)
+            items_html = clean_item_block + items_html
 
-        count += 1
         time.sleep(REQUEST_SLEEP)
-
-    # Add this page’s episodes **newest first**
-    items_html += "".join(episodes_to_add)
 
     # --- Next page ---
     next_link = archive.select_one("a.pager")
