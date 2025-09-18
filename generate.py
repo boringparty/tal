@@ -8,12 +8,15 @@ from datetime import datetime
 import json
 import time
 
+# --- CONFIG ---
 MODE = os.getenv("SCRAPER_MODE", "test")  # "test" | "all" | "new_only"
 MAX_EPISODES = 5 if MODE == "test" else None
-pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1
-
 FEED_FILE = "feed.xml"
+archive_url = "https://www.thisamericanlife.org/archive"
+session = requests.Session()
+scrape_date_str = datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")
+
 BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
   <channel>
@@ -24,14 +27,11 @@ BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
     <copyright>Copyright © Ira Glass / This American Life</copyright>
     <itunes:image href="https://i.imgur.com/pTMCfn9.png"/>
 """
+
 BASE_FOOTER = """
   </channel>
 </rss>
 """
-
-archive_url = "https://www.thisamericanlife.org/archive"
-session = requests.Session()
-scrape_date_str = datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")
 
 # --- Load existing feed ---
 existing_episodes = set()
@@ -48,7 +48,7 @@ else:
 
 new_items = ""
 
-# --- Scraping ---
+# --- Scraping loop ---
 while archive_url:
     print(f"Fetching {archive_url}")
     r = session.get(archive_url)
@@ -61,10 +61,11 @@ while archive_url:
             break
 
         full_url = urljoin("https://www.thisamericanlife.org", link["href"])
-        ep_page = BeautifulSoup(session.get(full_url).content, "html.parser")
+        r_ep = session.get(full_url)
+        ep_soup = BeautifulSoup(r_ep.content, "html.parser")
 
-        # Episode info
-        date_span = ep_page.select_one("span.date-display-single")
+        # --- Episode info ---
+        date_span = ep_soup.select_one("span.date-display-single")
         original_air = ""
         if date_span:
             try:
@@ -73,7 +74,7 @@ while archive_url:
             except:
                 pass
 
-        title_meta = ep_page.select_one("script#playlist-data")
+        title_meta = ep_soup.select_one("script#playlist-data")
         if not title_meta:
             continue
         data = json.loads(title_meta.string)
@@ -83,20 +84,23 @@ while archive_url:
         ep_num = data["title"].split(":", 1)[0].strip()
         ep_title = data["title"].strip()
 
-        if pull_new_only and ep_num in existing_episodes:
+        # --- Skip if already in feed ---
+        if ep_num in existing_episodes:
             continue
 
         audio_url = data["audio"]
         final_url = session.head(audio_url, allow_redirects=True).url
-        clean_url = urlunparse(urlparse(final_url)._replace(query=""))
+        parsed = urlparse(final_url)
+        clean_url = urlunparse(parsed._replace(query=""))
 
-        # Description
+        # --- Description ---
         desc_parts = []
-        meta_desc = ep_page.select_one("meta[name='description']")
+        meta_desc = ep_soup.select_one("meta[name='description']")
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
 
-        for act in ep_page.select("div.field-items > div.field-item > article.node-act"):
+        # --- Scrape segments ---
+        for act in ep_soup.select("div.field-items > div.field-item > article.node-act"):
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
             act_desc_tag = act.select_one(".field-name-body .field-item p")
@@ -139,8 +143,8 @@ while archive_url:
 """
         new_items += item_block
 
-        # Clean version
-        clean_link = ep_page.select_one('a[href*="clean"]')
+        # --- Clean version ---
+        clean_link = ep_soup.select_one('a[href*="clean"]')
         if clean_link:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link["href"])
             clean_item = f"""
