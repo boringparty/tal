@@ -9,12 +9,14 @@ from datetime import datetime
 import time
 
 # --- CONFIGURATION ---
-MODE = os.getenv("SCRAPER_MODE", "test5")  # test5 | all | new_only
-MAX_EPISODES = 5 if MODE == "test5" else None
+MODE = os.getenv("SCRAPER_MODE", "test")  # test | all | new_only
+MAX_EPISODES = 5 if MODE == "test" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1
 
+FEED_FILE = "feed.xml"
+DB_FILE = "episodes.json"
 BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
   <channel>
@@ -25,33 +27,38 @@ BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
     <copyright>Copyright © Ira Glass / This American Life</copyright>
     <itunes:image href="https://i.imgur.com/0MMrLC4.png"/>
 """
-
 BASE_FOOTER = """
   </channel>
 </rss>
 """
 
-FEED_FILE = "feed.xml"
-items_html = ""
-prev_ep_num = 0  # for repeat detection
+# --- Load episode DB ---
+if os.path.exists(DB_FILE):
+    with open(DB_FILE, "r", encoding="utf-8") as f:
+        episodes_db = json.load(f)
+else:
+    episodes_db = {}
 
-# --- LOAD EXISTING EPISODES ---
-existing_episodes = {}
+items_html = ""
+scrape_date = datetime.utcnow()
+scrape_pubdate_str = scrape_date.strftime("%a, %d %b %Y 00:00:00 +0000")
+
+# --- Load existing episodes for new_only mode ---
+existing_episodes = set()
 if pull_new_only and os.path.exists(FEED_FILE):
     with open(FEED_FILE, "r", encoding="utf-8") as f:
         old_feed = BeautifulSoup(f.read(), "xml")
         for item in old_feed.find_all("item"):
             ep_tag = item.find("itunes:episode")
             if ep_tag:
-                existing_episodes[ep_tag.text.strip()] = True
+                existing_episodes.add(ep_tag.text.strip())
 
-# --- SETUP ---
+# --- Setup ---
 archive_url = "https://www.thisamericanlife.org/archive"
 session = requests.Session()
-scrape_date = datetime.utcnow()
-scrape_pubdate_str = scrape_date.strftime("%a, %d %b %Y 00:00:00 +0000")
 
-# --- SCRAPING LOOP ---
+# --- Scraping loop ---
+seen_keys = set()
 while archive_url:
     print(f"Fetching {archive_url}")
     r = session.get(archive_url)
@@ -59,6 +66,8 @@ while archive_url:
     archive = BeautifulSoup(content, "html.parser")
 
     count = 0
+    episodes_to_add = []  # keep newest-first order per page
+
     for episode_link in archive.select("header > a.goto-episode"):
         if MAX_EPISODES and count >= MAX_EPISODES:
             break
@@ -67,7 +76,7 @@ while archive_url:
         r_episode = session.get(full_url)
         episode = BeautifulSoup(r_episode.content, "html.parser")
 
-        # --- Episode date ---
+        # --- Original air date ---
         date_span = episode.select_one("span.date-display-single")
         original_air_date_str = ""
         if date_span:
@@ -86,6 +95,7 @@ while archive_url:
             continue
 
         ep_num = int(player_data["title"].split(":", 1)[0].strip())
+        ep_num_padded = f"{ep_num:04d}"
         ep_title_base = ":".join(player_data["title"].split(":", 1)[1:]).strip()
 
         # Skip new_only if already in feed
@@ -106,55 +116,63 @@ while archive_url:
         clean_link_tag = episode.select_one('a[href*="clean"]')
         has_clean = bool(clean_link_tag)
 
-        # --- Repeat detection ---
-        is_repeat = ep_num < prev_ep_num
-
-        title_parts = []
+        # --- Determine keys ---
+        keys = []
         if has_clean:
-            title_parts.append("Clean")
-        if is_repeat:
-            title_parts.append(f"Repeat {original_air_date_str}")
+            keys.append(f"{ep_num_padded}-clean")
+        keys.append(f"{ep_num_padded}-explicit")
 
-        if title_parts:
-            ep_title = f"{ep_num}: {ep_title_base} ({'; '.join(title_parts)})"
-        else:
-            ep_title = f"{ep_num}: {ep_title_base}"
+        for key in keys:
+            is_clean = key.endswith("-clean")
+            # --- Repeat detection ---
+            first_scrape_date = episodes_db.get(key)
+            is_repeat = bool(first_scrape_date)
+            if not is_repeat:
+                episodes_db[key] = scrape_date.strftime("%Y-%m-%d")  # store first scrape date
 
-        explicit_flag = "no" if has_clean else "yes"
+            # --- Title ---
+            title_parts = []
+            if is_clean:
+                title_parts.append("Clean")
+            if is_repeat:
+                title_parts.append(f"Repeat {original_air_date_str}")
 
-        # --- Description ---
-        desc_parts = []
-        meta_desc = episode.select_one("meta[name='description']")
-        if meta_desc:
-            desc_parts.append(meta_desc["content"].strip())
-
-        for act in episode.select("div.field-items > div.field-item > article.node-act"):
-            act_label_tag = act.select_one(".field-name-field-act-label .field-item")
-            act_title_tag = act.select_one(".act-header a.goto-act")
-            act_desc_tag = act.select_one(".field-name-body .field-item p")
-
-            act_label = act_label_tag.text.strip() if act_label_tag else ""
-            act_title = act_title_tag.text.strip() if act_title_tag else ""
-            act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
-
-            if act_label.lower() == "prologue":
-                act_text = act_label
-                if act_title and act_title.lower() != "prologue":
-                    act_text += f": {act_title}"
-                if act_desc:
-                    act_text += f"\n{act_desc}"
+            if title_parts:
+                ep_title = f"{ep_num}: {ep_title_base} ({'; '.join(title_parts)})"
             else:
-                act_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
-                if act_desc:
-                    act_text += f"\n{act_desc}"
+                ep_title = f"{ep_num}: {ep_title_base}"
 
-            if act_text:
-                desc_parts.append(act_text)
+            explicit_flag = "no" if is_clean else "yes"
+            item_url = clean_url if is_clean else clean_url
 
-        full_description = "\n\n".join(desc_parts)
+            # --- Description ---
+            desc_parts = []
+            meta_desc = episode.select_one("meta[name='description']")
+            if meta_desc:
+                desc_parts.append(meta_desc["content"].strip())
+            for act in episode.select("div.field-items > div.field-item > article.node-act"):
+                act_label_tag = act.select_one(".field-name-field-act-label .field-item")
+                act_title_tag = act.select_one(".act-header a.goto-act")
+                act_desc_tag = act.select_one(".field-name-body .field-item p")
+                act_label = act_label_tag.text.strip() if act_label_tag else ""
+                act_title = act_title_tag.text.strip() if act_title_tag else ""
+                act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
+                if act_label.lower() == "prologue":
+                    act_text = act_label
+                    if act_title and act_title.lower() != "prologue":
+                        act_text += f": {act_title}"
+                    if act_desc:
+                        act_text += f"\n{act_desc}"
+                else:
+                    act_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
+                    if act_desc:
+                        act_text += f"\n{act_desc}"
+                if act_text:
+                    desc_parts.append(act_text)
+            full_description = "\n\n".join(desc_parts)
 
-        # --- Build item HTML ---
-        item_block = f"""
+            # --- Build item HTML ---
+            item_block = f"""
     <item>
       <title>{ep_title}</title>
       <link>{full_url.strip()}</link>
@@ -163,31 +181,16 @@ while archive_url:
       <itunes:explicit>{explicit_flag}</itunes:explicit>
       <description>{full_description}</description>
       <pubDate>{scrape_pubdate_str}</pubDate>
-      <enclosure url="{clean_url}" type="audio/mpeg"/>
+      <enclosure url="{item_url}" type="audio/mpeg"/>
     </item>
 """
-        items_html = item_block + items_html
-        prev_ep_num = ep_num
+            episodes_to_add.append(item_block)
+
         count += 1
-
-        # Optional clean version
-        if has_clean:
-            clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
-            clean_item_block = f"""
-    <item>
-      <title>{ep_title}</title>
-      <link>{full_url.strip()}</link>
-      <itunes:episode>{ep_num}</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>{full_description}</description>
-      <pubDate>{scrape_pubdate_str}</pubDate>
-      <enclosure url="{clean_audio_url}" type="audio/mpeg"/>
-    </item>
-"""
-            items_html = clean_item_block + items_html
-
         time.sleep(REQUEST_SLEEP)
+
+    # Add this page's episodes newest-first
+    items_html += "".join(episodes_to_add)
 
     # --- Next page ---
     next_link = archive.select_one("a.pager")
@@ -198,3 +201,7 @@ with open(FEED_FILE, "w", encoding="utf-8") as f:
     f.write(BASE_HEADER)
     f.write(items_html)
     f.write(BASE_FOOTER)
+
+# --- Save episodes DB ---
+with open(DB_FILE, "w", encoding="utf-8") as f:
+    json.dump(episodes_db, f, indent=2)
