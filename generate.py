@@ -14,6 +14,7 @@ MAX_EPISODES = 5 if MODE == "test" else None
 REQUEST_SLEEP = 1
 FEED_FILE = "feed.xml"
 EPISODES_FILE = "episodes.txt"
+
 BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
   <channel>
@@ -24,6 +25,7 @@ BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
     <copyright>Copyright © Ira Glass / This American Life</copyright>
     <itunes:image href="https://i.imgur.com/pTMCfn9.png"/>
 """
+
 BASE_FOOTER = """
   </channel>
 </rss>
@@ -102,7 +104,6 @@ while archive_url:
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
 
-        # Segments
         for act in ep_soup.select("div.field-items > div.field-item > article.node-act"):
             act_label_tag = act.select_one(".field-name-field-act-label .field-item")
             act_title_tag = act.select_one(".act-header a.goto-act")
@@ -122,6 +123,7 @@ while archive_url:
                 act_text = f"{act_label}: {act_title_seg}" if act_label and act_title_seg else act_label or act_title_seg
                 if act_desc_seg:
                     act_text += f"\n{act_desc_seg}"
+
             if act_text:
                 desc_parts.append(act_text)
 
@@ -129,7 +131,7 @@ while archive_url:
         full_desc = "\n\n".join(desc_parts)
 
         # --- Build item ---
-        title_suffix = " (Repeat)" if is_repeat else ""
+        title_suffix = " - Repeat" if is_repeat else ""
         item_block = f"""
     <item>
       <title>{ep_title}{title_suffix}</title>
@@ -169,6 +171,15 @@ while archive_url:
         count += 1
         time.sleep(REQUEST_SLEEP)
 
+        # Stop after first episode if new_only
+        if MODE == "new_only":
+            break
+
+    # Stop pagination for new_only
+    if MODE == "new_only":
+        break
+
+    # Pagination for all mode
     next_link = archive.select_one("a.pager")
     archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if MODE == "all" and next_link else None
 
