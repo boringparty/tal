@@ -88,11 +88,11 @@ while archive_url:
         title = player_data["title"].strip()
 
         # Skip already-seen episodes
-        if pull_new_only and ep_num in existing_episodes:
-            continue
+        #if pull_new_only and ep_num in existing_episodes:
+        #    continue
         if pull_new_only and episode_date and episode_date.date() < yesterday.date():
             continue
-
+          
         # --- Detect repeat ---
         is_repeat = "Originally aired" in title
 
