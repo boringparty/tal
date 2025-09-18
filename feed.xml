@@ -1,4 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
+#!/usr/bin/env python3
+
+import os
+import json
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse, urlunparse
+from datetime import datetime
+import time
+
+# --- CONFIGURATION ---
+MODE = os.getenv("SCRAPER_MODE", "test10")  # test10 | all | new_only
+MAX_EPISODES = 10 if MODE == "test10" else None
+pull_everything = MODE == "all"
+pull_new_only = MODE == "new_only"
+REQUEST_SLEEP = 1
+
+BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
   <channel>
     <title>This American Archive</title>
@@ -7,187 +24,177 @@
     <language>en</language>
     <copyright>Copyright © Ira Glass / This American Life</copyright>
     <itunes:image href="https://i.imgur.com/0MMrLC4.png"/>
+"""
 
-    <item>
-      <title>864: Chicago Hope (Clean; Repeat 2025-07-18)</title>
-      <link>https://www.thisamericanlife.org/864/chicago-hope</link>
-      <itunes:episode>864</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>The story of the most commonly performed surgery, and what goes terribly wrong with it.
-
-Prologue
-Ira Glass introduces the first episode of an inventive new podcast from longtime This American Life producer and editor Susan Burton.
-
-Act One: Act One
-Susan Burton introduces Mindy, a labor and delivery nurse at UI Health at the University of Illinois at Chicago. (5 minutes)
-
-Act Two: Act Two
-Another labor and delivery nurse at UI Health, Clara, gets ready to deliver twins at her own hospital and receives an epidural. (19 minutes)
-
-Act Three: Act Three
-Clara’s anesthesia is not working. She is now in the middle of major abdominal surgery, and she can feel that surgery. (21 minutes)
-
-Act Four: Act Four
-Heather, the head of obstetric anesthesia at UI Health, gets up onstage and asks a ballroom full of hundreds of anesthesiologists to wrestle with the question of why patients are feeling pain during C-sections, and what they can do to solve it. (8 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/864.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>864: Chicago Hope (Clean; Repeat 2025-07-18)</title>
-      <link>https://www.thisamericanlife.org/864/chicago-hope</link>
-      <itunes:episode>864</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>The story of the most commonly performed surgery, and what goes terribly wrong with it.
-
-Prologue
-Ira Glass introduces the first episode of an inventive new podcast from longtime This American Life producer and editor Susan Burton.
-
-Act One: Act One
-Susan Burton introduces Mindy, a labor and delivery nurse at UI Health at the University of Illinois at Chicago. (5 minutes)
-
-Act Two: Act Two
-Another labor and delivery nurse at UI Health, Clara, gets ready to deliver twins at her own hospital and receives an epidural. (19 minutes)
-
-Act Three: Act Three
-Clara’s anesthesia is not working. She is now in the middle of major abdominal surgery, and she can feel that surgery. (21 minutes)
-
-Act Four: Act Four
-Heather, the head of obstetric anesthesia at UI Health, gets up onstage and asks a ballroom full of hundreds of anesthesiologists to wrestle with the question of why patients are feeling pain during C-sections, and what they can do to solve it. (8 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://dcs-spotify.megaphone.fm/NPR3974539898.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>865: The Other Territory (Clean; Repeat 2025-08-22)</title>
-      <link>https://www.thisamericanlife.org/865/the-other-territory</link>
-      <itunes:episode>865</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>Since October 7, Israel has intensified restrictions on West Bank Palestinians while global attention focused on Gaza. We travel to the West Bank to see these changes in person.
-
-Prologue
-Ira joins Hamed on his Monday commute. He has to navigate a constantly changing series of checkpoints and roadblocks to get to work each day. Hamed works for Comet-ME, which sets up solar panels, water systems, and security cameras in small villages all over the West Bank. (13 minutes)
-
-Act One: Ali and the Duster
-Settler violence has worsened significantly in the West Bank since October 7, 2023. Yael Even Or travels to a tiny village called Tuba, surrounded by Israeli settlements, to meet the 27-year-old resident trying to protect it. (26 minutes)
-
-Snapshots (podcast only)
-Two quick snapshots of life in the West Bank since October 7th. (6 minutes)
-
-Act Two: What Happened to Walid
-After October 7th, Israeli Minister of Security Itamar Ben-Gvir increased restrictions on Palestinian prisoners in Israeli security prisons. Prisoners started dying. Dana Chivvis looks into one of those deaths. (25 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/865.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>865: The Other Territory (Clean; Repeat 2025-08-22)</title>
-      <link>https://www.thisamericanlife.org/865/the-other-territory</link>
-      <itunes:episode>865</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>Since October 7, Israel has intensified restrictions on West Bank Palestinians while global attention focused on Gaza. We travel to the West Bank to see these changes in person.
-
-Prologue
-Ira joins Hamed on his Monday commute. He has to navigate a constantly changing series of checkpoints and roadblocks to get to work each day. Hamed works for Comet-ME, which sets up solar panels, water systems, and security cameras in small villages all over the West Bank. (13 minutes)
-
-Act One: Ali and the Duster
-Settler violence has worsened significantly in the West Bank since October 7, 2023. Yael Even Or travels to a tiny village called Tuba, surrounded by Israeli settlements, to meet the 27-year-old resident trying to protect it. (26 minutes)
-
-Snapshots (podcast only)
-Two quick snapshots of life in the West Bank since October 7th. (6 minutes)
-
-Act Two: What Happened to Walid
-After October 7th, Israeli Minister of Security Itamar Ben-Gvir increased restrictions on Palestinian prisoners in Israeli security prisons. Prisoners started dying. Dana Chivvis looks into one of those deaths. (25 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://dcs-spotify.megaphone.fm/NPR3210182538.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>233: Starting From Scratch (Repeat 2003-03-07)</title>
-      <link>https://www.thisamericanlife.org/233/starting-from-scratch</link>
-      <itunes:episode>233</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>yes</itunes:explicit>
-      <description>A man in retirement tries to start over in a new life with a new venture: a cable channel, with lots of puppies.
-
-Prologue
-Host Ira Glass talks to Jorge Just, who thought he'd started over successfully. He'd moved to New York, found an apartment that everyone told him was a great deal, things were looking good. Then a reality television show visited his building. (8 minutes)
-
-Act One: Puppy Love, the Business Model
-Molly FitzSimons tells the story of her father starting over. After 25 years in the same zip code, as an executive in the same company, he moved to Los Angeles and tried to start over in a new life with a new venture: A cable channel, with no people, no talking, no plots, but lots and lots of puppies. (15 minutes)
-
-Act Two: Making Money The Old Fashioned Way
-Mary Beth Kirchner documents one day in the life of a hustler named Joe, who wakes up every morning broke, hustles as much as $10,000 during the day and then loses most of it by the time he goes to bed. What it's like to start from scratch every day of your life. (18 minutes)
-
-Act Three: The First Starting From Scratch
-Jonathan Goldstein reads a story about the first people to ever start from scratch, a couple named Adam and Eve. (14 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://dcs-spotify.megaphone.fm/NPR4591929511.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>866: Watch Out for That Tree (Repeat 2025-09-05)</title>
-      <link>https://www.thisamericanlife.org/866/watch-out-for-that-tree</link>
-      <itunes:episode>866</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>yes</itunes:explicit>
-      <description>Small human plans that run into much larger obstacles.
-
-Prologue
-Angela's dad, an accountant, made a spreadsheet to prepare for their family trip to a national park. But there are things you never think to put in a spreadsheet. (7 minutes)
-
-Act One: Forces Outside Our Control
-A young couple, excited to start a new chapter in their lives, is suddenly put on a very different trajectory. (30 minutes)
-
-Act Two: The Engineer
-A sixteen-year-old plans out a prank, and a complete stranger from Honduras ends up in a million-dollar deal. What could go wrong? (25 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://dcs-spotify.megaphone.fm/NPR5310093493.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>867: College Disorientation (Clean; Repeat 2025-09-12)</title>
-      <link>https://www.thisamericanlife.org/867/college-disorientation</link>
-      <itunes:episode>867</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>Things are different on college campuses this year. We see inside the drama, with students and staff.
-
-Prologue
-We go to orientation at Arizona State University and meet international students who are trying to make friends. (6 minutes)
-
-Act One: My Black President
-The president of the Black Student Union at the University of Utah fights to keep the B in BSU. (30 minutes)
-
-Act Two: The Art of the Deal
-A definition of antisemitism, canceled classes, and angry professors at Columbia University. (16 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://www.thisamericanlife.org/sites/default/files/audio/upload/clean/867.mp3" type="audio/mpeg"/>
-    </item>
-
-    <item>
-      <title>867: College Disorientation (Clean; Repeat 2025-09-12)</title>
-      <link>https://www.thisamericanlife.org/867/college-disorientation</link>
-      <itunes:episode>867</itunes:episode>
-      <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>no</itunes:explicit>
-      <description>Things are different on college campuses this year. We see inside the drama, with students and staff.
-
-Prologue
-We go to orientation at Arizona State University and meet international students who are trying to make friends. (6 minutes)
-
-Act One: My Black President
-The president of the Black Student Union at the University of Utah fights to keep the B in BSU. (30 minutes)
-
-Act Two: The Art of the Deal
-A definition of antisemitism, canceled classes, and angry professors at Columbia University. (16 minutes)</description>
-      <pubDate>Thu, 18 Sep 2025 00:00:00 +0000</pubDate>
-      <enclosure url="https://dcs-spotify.megaphone.fm/NPR2581159385.mp3" type="audio/mpeg"/>
-    </item>
-
+BASE_FOOTER = """
   </channel>
 </rss>
+"""
+
+FEED_FILE = "feed.xml"
+items_html = ""
+prev_ep_num = 0  # for repeat detection
+
+# --- LOAD EXISTING EPISODES ---
+existing_episodes = {}
+if pull_new_only and os.path.exists(FEED_FILE):
+    with open(FEED_FILE, "r", encoding="utf-8") as f:
+        old_feed = BeautifulSoup(f.read(), "xml")
+        for item in old_feed.find_all("item"):
+            ep_tag = item.find("itunes:episode")
+            if ep_tag:
+                existing_episodes[ep_tag.text.strip()] = True
+
+# --- SETUP ---
+archive_url = "https://www.thisamericanlife.org/archive"
+session = requests.Session()
+scrape_date = datetime.utcnow()
+scrape_pubdate_str = scrape_date.strftime("%a, %d %b %Y 00:00:00 +0000")
+
+# --- SCRAPING LOOP ---
+while archive_url:
+    print(f"Fetching {archive_url}")
+    r = session.get(archive_url)
+    content = r.json()["html"] if "application/json" in r.headers.get("Content-Type", "") else r.content
+    archive = BeautifulSoup(content, "html.parser")
+
+    count = 0
+    for episode_link in archive.select("header > a.goto-episode"):
+        if MAX_EPISODES and count >= MAX_EPISODES:
+            break
+
+        full_url = urljoin("https://www.thisamericanlife.org", episode_link["href"])
+        r_episode = session.get(full_url)
+        episode = BeautifulSoup(r_episode.content, "html.parser")
+
+        # --- Episode date ---
+        date_span = episode.select_one("span.date-display-single")
+        original_air_date_str = ""
+        if date_span:
+            try:
+                ep_date = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
+                original_air_date_str = ep_date.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+
+        # --- Playlist / audio ---
+        title_meta = episode.select_one("script#playlist-data")
+        if not title_meta:
+            continue
+        player_data = json.loads(title_meta.string)
+        if "audio" not in player_data:
+            continue
+
+        ep_num = int(player_data["title"].split(":", 1)[0].strip())
+        ep_title_base = ":".join(player_data["title"].split(":", 1)[1:]).strip()
+
+        # Skip new_only if already in feed
+        if pull_new_only and str(ep_num) in existing_episodes:
+            continue
+
+        # --- Audio URLs ---
+        audio_url = player_data["audio"]
+        final_url = session.head(audio_url, allow_redirects=True).url
+        parsed = urlparse(final_url)
+        clean_url = urlunparse(parsed._replace(query=""))
+
+        # Skip promos
+        if "/promos/" in clean_url:
+            continue
+
+        # --- Clean version ---
+        clean_link_tag = episode.select_one('a[href*="clean"]')
+        has_clean = bool(clean_link_tag)
+
+        # --- Repeat detection ---
+        is_repeat = ep_num < prev_ep_num
+
+        title_parts = []
+        if has_clean:
+            title_parts.append("Clean")
+        if is_repeat:
+            title_parts.append(f"Repeat {original_air_date_str}")
+
+        if title_parts:
+            ep_title = f"{ep_num}: {ep_title_base} ({'; '.join(title_parts)})"
+        else:
+            ep_title = f"{ep_num}: {ep_title_base}"
+
+        explicit_flag = "no" if has_clean else "yes"
+
+        # --- Description ---
+        desc_parts = []
+        meta_desc = episode.select_one("meta[name='description']")
+        if meta_desc:
+            desc_parts.append(meta_desc["content"].strip())
+
+        for act in episode.select("div.field-items > div.field-item > article.node-act"):
+            act_label_tag = act.select_one(".field-name-field-act-label .field-item")
+            act_title_tag = act.select_one(".act-header a.goto-act")
+            act_desc_tag = act.select_one(".field-name-body .field-item p")
+
+            act_label = act_label_tag.text.strip() if act_label_tag else ""
+            act_title = act_title_tag.text.strip() if act_title_tag else ""
+            act_desc = act_desc_tag.text.strip() if act_desc_tag else ""
+
+            if act_label.lower() == "prologue":
+                act_text = act_label
+                if act_title and act_title.lower() != "prologue":
+                    act_text += f": {act_title}"
+                if act_desc:
+                    act_text += f"\n{act_desc}"
+            else:
+                act_text = f"{act_label}: {act_title}" if act_label and act_title else act_label or act_title
+                if act_desc:
+                    act_text += f"\n{act_desc}"
+
+            if act_text:
+                desc_parts.append(act_text)
+
+        full_description = "\n\n".join(desc_parts)
+
+        # --- Build item HTML ---
+        item_block = f"""
+    <item>
+      <title>{ep_title}</title>
+      <link>{full_url.strip()}</link>
+      <itunes:episode>{ep_num}</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:explicit>{explicit_flag}</itunes:explicit>
+      <description>{full_description}</description>
+      <pubDate>{scrape_pubdate_str}</pubDate>
+      <enclosure url="{clean_url}" type="audio/mpeg"/>
+    </item>
+"""
+        items_html = item_block + items_html
+        prev_ep_num = ep_num
+        count += 1
+
+        # Optional clean version
+        if has_clean:
+            clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
+            clean_item_block = f"""
+    <item>
+      <title>{ep_title}</title>
+      <link>{full_url.strip()}</link>
+      <itunes:episode>{ep_num}</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:explicit>no</itunes:explicit>
+      <description>{full_description}</description>
+      <pubDate>{scrape_pubdate_str}</pubDate>
+      <enclosure url="{clean_audio_url}" type="audio/mpeg"/>
+    </item>
+"""
+            items_html = clean_item_block + items_html
+
+        time.sleep(REQUEST_SLEEP)
+
+    # --- Next page ---
+    next_link = archive.select_one("a.pager")
+    archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if pull_everything and next_link else None
+
+# --- Write final feed ---
+with open(FEED_FILE, "w", encoding="utf-8") as f:
+    f.write(BASE_HEADER)
+    f.write(items_html)
+    f.write(BASE_FOOTER)
