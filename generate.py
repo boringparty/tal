@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -33,7 +32,6 @@ BASE_FOOTER = """
 
 archive_url = "https://www.thisamericanlife.org/archive"
 session = requests.Session()
-scrape_date_str = datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")
 
 # --- Load existing episodes.txt ---
 if os.path.exists(EPISODES_FILE):
@@ -49,7 +47,7 @@ if os.path.exists(FEED_FILE):
 else:
     feed_content = BASE_HEADER + BASE_FOOTER
 
-new_items = ""
+all_items = []
 
 # --- Scraping loop ---
 while archive_url:
@@ -70,10 +68,13 @@ while archive_url:
         # --- Episode info ---
         date_span = ep_soup.select_one("span.date-display-single")
         original_air = ""
+        pub_date_rfc = ""
         if date_span:
             try:
                 original_air_dt = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
                 original_air = original_air_dt.strftime("%Y-%m-%d")
+                # RFC 2822 format for RSS
+                pub_date_rfc = original_air_dt.strftime("%a, %d %b %Y 00:00:00 +0000")
             except:
                 pass
 
@@ -98,7 +99,7 @@ while archive_url:
         parsed = urlparse(final_url)
         clean_url = urlunparse(parsed._replace(query=""))
 
-        # --- Description with segments ---
+        # --- Description ---
         desc_parts = []
         meta_desc = ep_soup.select_one("meta[name='description']")
         if meta_desc:
@@ -123,16 +124,18 @@ while archive_url:
                 act_text = f"{act_label}: {act_title_seg}" if act_label and act_title_seg else act_label or act_title_seg
                 if act_desc_seg:
                     act_text += f"\n{act_desc_seg}"
-
             if act_text:
                 desc_parts.append(act_text)
 
         desc_parts.append(f"Originally aired: {original_air}")
         full_desc = "\n\n".join(desc_parts)
 
-        # --- Build item ---
+        # --- Build item blocks ---
         title_suffix = " - Repeat" if is_repeat else ""
-        item_block = f"""
+        items_to_add = []
+
+        # Normal
+        items_to_add.append(f"""
     <item>
       <title>{ep_title}{title_suffix}</title>
       <link>{full_url}</link>
@@ -142,17 +145,16 @@ while archive_url:
       <description>
 {full_desc}
       </description>
-      <pubDate>{scrape_date_str}</pubDate>
+      <pubDate>{pub_date_rfc if MODE == 'all' else datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")}</pubDate>
       <enclosure url="{clean_url}" type="audio/mpeg"/>
     </item>
-"""
-        new_items += item_block
+""")
 
-        # --- Clean version ---
+        # Clean
         clean_link = ep_soup.select_one('a[href*="clean"]')
         if clean_link:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link["href"])
-            clean_item = f"""
+            items_to_add.append(f"""
     <item>
       <title>{ep_title}{title_suffix} (Clean)</title>
       <link>{full_url}</link>
@@ -162,30 +164,39 @@ while archive_url:
       <description>
 {full_desc}
       </description>
-      <pubDate>{scrape_date_str}</pubDate>
+      <pubDate>{pub_date_rfc if MODE == 'all' else datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")}</pubDate>
       <enclosure url="{clean_audio_url}" type="audio/mpeg"/>
     </item>
-"""
-            new_items += clean_item
+""")
+
+        all_items.extend(items_to_add)
 
         count += 1
         time.sleep(REQUEST_SLEEP)
 
-        # Stop after first episode if new_only
         if MODE == "new_only":
             break
 
-    # Stop pagination for new_only
     if MODE == "new_only":
         break
 
-    # Pagination for all mode
     next_link = archive.select_one("a.pager")
     archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if MODE == "all" and next_link else None
 
+# --- Sort all items by episode number if MODE=all ---
+if MODE == "all" and all_items:
+    def extract_ep_num(item_str):
+        try:
+            start = item_str.index("<itunes:episode>") + len("<itunes:episode>")
+            end = item_str.index("</itunes:episode>")
+            return int(item_str[start:end].strip())
+        except:
+            return 0
+    all_items = sorted(all_items, key=extract_ep_num)
+
 # --- Write feed ---
-if new_items.strip():
-    feed_content = feed_content.replace(BASE_FOOTER, new_items + BASE_FOOTER)
+if all_items:
+    feed_content = BASE_HEADER + "\n".join(all_items) + BASE_FOOTER
     with open(FEED_FILE, "w", encoding="utf-8") as f:
         f.write(feed_content)
     print("Feed updated with new episodes.")
