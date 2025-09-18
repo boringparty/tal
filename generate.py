@@ -183,7 +183,7 @@ while archive_url:
     next_link = archive.select_one("a.pager")
     archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if MODE == "all" and next_link else None
 
-# --- Sort all items by episode number if MODE=all ---
+# --- Sort all items by episode number descending if MODE=all ---
 if MODE == "all" and all_items:
     def extract_ep_num(item_str):
         try:
@@ -192,7 +192,7 @@ if MODE == "all" and all_items:
             return int(item_str[start:end].strip())
         except:
             return 0
-    all_items = sorted(all_items, key=extract_ep_num)
+    all_items = sorted(all_items, key=extract_ep_num, reverse=True)
 
 # --- Write feed ---
 if all_items:
