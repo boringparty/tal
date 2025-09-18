@@ -9,8 +9,8 @@ from datetime import datetime
 import time
 
 # --- CONFIGURATION ---
-MODE = os.getenv("SCRAPER_MODE", "test10")  # test10 | all | new_only
-MAX_EPISODES = 10 if MODE == "test10" else None
+MODE = os.getenv("SCRAPER_MODE", "test5")  # test10 | all | new_only
+MAX_EPISODES = 10 if MODE == "test5" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1
