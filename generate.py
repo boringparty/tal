@@ -186,7 +186,11 @@ while archive_url:
     archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if pull_everything and next_link else None
 
 # --- Write final feed ---
-with open("feed.xml", "w", encoding="utf-8") as f:
-    f.write(BASE_HEADER)
-    f.write(items_html)
-    f.write(BASE_FOOTER)
+if items_html.strip():
+    with open("feed.xml", "w", encoding="utf-8") as f:
+        f.write(BASE_HEADER)
+        f.write(items_html)
+        f.write(BASE_FOOTER)
+    print("✅ Feed updated with new episodes.")
+else:
+    print("ℹ️ No new episodes found. Feed unchanged.")
