@@ -2,20 +2,18 @@
 
 import os
 import requests
-import json
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse
 from datetime import datetime, timedelta
+import json
 import time
 
-# --- CONFIG ---
+# --- CONFIGURATION ---
 MODE = os.getenv("SCRAPER_MODE", "test")  # "test" | "all" | "new_only"
 MAX_EPISODES = 5 if MODE == "test" else None
-pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1
 
-FEED_FILE = "feed.xml"
 BASE_HEADER = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
   <channel>
@@ -32,24 +30,30 @@ BASE_FOOTER = """
 </rss>
 """
 
-# --- LOAD EXISTING EPISODES ---
+FEED_FILE = "feed.xml"
+archive_url = "https://www.thisamericanlife.org/archive"
+session = requests.Session()
+scrape_date_str = datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")
+
+# --- Load existing episodes ---
 existing_episodes = set()
-if pull_new_only and os.path.exists(FEED_FILE):
+if os.path.exists(FEED_FILE):
     with open(FEED_FILE, "r", encoding="utf-8") as f:
         old_feed = BeautifulSoup(f.read(), "xml")
         for item in old_feed.find_all("item"):
             ep_tag = item.find("itunes:episode")
             if ep_tag:
                 existing_episodes.add(ep_tag.text.strip())
+    with open(FEED_FILE, "r", encoding="utf-8") as f:
+        feed_content = f.read()
+else:
+    feed_content = BASE_HEADER + BASE_FOOTER
 
-# --- SETUP ---
-archive_url = "https://www.thisamericanlife.org/archive"
-session = requests.Session()
-scrape_date_str = datetime.utcnow().strftime("%a, %d %b %Y 00:00:00 +0000")
-items_html = ""
+new_items = ""
 
-# --- SCRAPE ---
+# --- Scraping loop ---
 while archive_url:
+    print(f"Fetching {archive_url}")
     r = session.get(archive_url)
     content = r.json()["html"] if "application/json" in r.headers.get("Content-Type", "") else r.content
     archive = BeautifulSoup(content, "html.parser")
@@ -61,64 +65,49 @@ while archive_url:
 
         full_url = urljoin("https://www.thisamericanlife.org", link["href"])
         r_ep = session.get(full_url)
-        ep_page = BeautifulSoup(r_ep.content, "html.parser")
+        ep_soup = BeautifulSoup(r_ep.content, "html.parser")
 
-        # --- Episode date ---
-        date_span = ep_page.select_one("span.date-display-single")
-        original_date_str = ""
+        # --- Episode info ---
+        date_span = ep_soup.select_one("span.date-display-single")
+        original_air = ""
         if date_span:
             try:
-                original_date = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
-                original_date_str = original_date.strftime("%Y-%m-%d")
-            except Exception:
+                original_air_dt = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
+                original_air = original_air_dt.strftime("%Y-%m-%d")
+            except:
                 pass
 
-        # --- Playlist/audio ---
-        title_meta = ep_page.select_one("script#playlist-data")
+        title_meta = ep_soup.select_one("script#playlist-data")
         if not title_meta:
             continue
-        player_data = json.loads(title_meta.string)
-        if "audio" not in player_data:
+        data = json.loads(title_meta.string)
+        if "audio" not in data:
             continue
 
-        ep_num = player_data["title"].split(":", 1)[0].strip()
-        title_base = player_data["title"].strip()
+        ep_num = data["title"].split(":", 1)[0].strip()
+        ep_title = data["title"].strip()
 
-        # Skip if new_only and already in feed
+        # --- Skip already seen if new_only ---
         if pull_new_only and ep_num in existing_episodes:
             continue
 
-        audio_url = player_data["audio"]
+        audio_url = data["audio"]
         final_url = session.head(audio_url, allow_redirects=True).url
-        clean_url = urlunparse(urlparse(final_url)._replace(query=""))
+        parsed = urlparse(final_url)
+        clean_url = urlunparse(parsed._replace(query=""))
 
-        # Skip promos
-        if "/promos/" in clean_url:
-            continue
-
-        # --- Build description ---
+        # --- Description ---
         desc_parts = []
-        meta_desc = ep_page.select_one("meta[name='description']")
+        meta_desc = ep_soup.select_one("meta[name='description']")
         if meta_desc:
             desc_parts.append(meta_desc["content"].strip())
-
-        for act in ep_page.select("div.field-items > div.field-item > article.node-act"):
-            act_label = act.select_one(".field-name-field-act-label .field-item")
-            act_title = act.select_one(".act-header a.goto-act")
-            act_desc = act.select_one(".field-name-body .field-item p")
-            text = ""
-            if act_label: text += act_label.text.strip()
-            if act_title and text != act_title.text.strip(): text += f": {act_title.text.strip()}"
-            if act_desc: text += f"\n{act_desc.text.strip()}"
-            if text: desc_parts.append(text)
-
-        desc_parts.append(f"Originally aired: {original_date_str}")
+        desc_parts.append(f"Originally aired: {original_air}")
         full_desc = "\n\n".join(desc_parts)
 
-        # --- Build XML item ---
+        # --- Build item ---
         item_block = f"""
     <item>
-      <title>{title_base}</title>
+      <title>{ep_title}</title>
       <link>{full_url}</link>
       <itunes:episode>{ep_num}</itunes:episode>
       <itunes:episodeType>full</itunes:episodeType>
@@ -128,25 +117,25 @@ while archive_url:
       <enclosure url="{clean_url}" type="audio/mpeg"/>
     </item>
 """
-        items_html += item_block
+        new_items += item_block
 
-        # Optional clean version
-        clean_link_tag = ep_page.select_one('a[href*="clean"]')
-        if clean_link_tag:
-            clean_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
-            clean_item_block = f"""
+        # --- Clean version ---
+        clean_link = ep_soup.select_one('a[href*="clean"]')
+        if clean_link:
+            clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link["href"])
+            clean_item = f"""
     <item>
-      <title>{title_base} (Clean)</title>
+      <title>{ep_title} (Clean)</title>
       <link>{full_url}</link>
       <itunes:episode>{ep_num}</itunes:episode>
       <itunes:episodeType>full</itunes:episodeType>
       <itunes:explicit>no</itunes:explicit>
       <description>{full_desc}</description>
       <pubDate>{scrape_date_str}</pubDate>
-      <enclosure url="{clean_url}" type="audio/mpeg"/>
+      <enclosure url="{clean_audio_url}" type="audio/mpeg"/>
     </item>
 """
-            items_html += clean_item_block
+            new_items += clean_item
 
         existing_episodes.add(ep_num)
         count += 1
@@ -154,12 +143,13 @@ while archive_url:
 
     # --- Next page ---
     next_link = archive.select_one("a.pager")
-    archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if pull_everything and next_link else None
+    archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if MODE == "all" and next_link else None
 
-# --- WRITE FEED ONLY IF NEW EPISODES ---
-if items_html.strip():
-    with open(FEED_FILE, "a", encoding="utf-8") as f:
-        f.write(items_html)
+# --- Write feed ---
+if new_items.strip():
+    feed_content = feed_content.replace(BASE_FOOTER, new_items + BASE_FOOTER)
+    with open(FEED_FILE, "w", encoding="utf-8") as f:
+        f.write(feed_content)
     print("Feed updated with new episodes.")
 else:
-    print("No new episodes found.")
+    print("No new episodes found. Feed unchanged.")
