@@ -97,7 +97,8 @@ while archive_url:
         audio_url = data["audio"]
         final_url = session.head(audio_url, allow_redirects=True).url
         parsed = urlparse(final_url)
-        clean_url = urlunparse(parsed._replace(query=""))
+        clean_url = audio_url
+        # urlunparse(parsed._replace(query=""))
 
         # --- Description ---
         desc_parts = []
