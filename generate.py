@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 import time
 
 # --- CONFIGURATION ---
-MODE = os.getenv("SCRAPER_MODE", "test5")  # "test5" | "all" | "new_only"
-MAX_EPISODES = 5 if MODE == "test5" else None
+MODE = os.getenv("SCRAPER_MODE", "test")  # "test" | "all" | "new_only"
+MAX_EPISODES = 5 if MODE == "test" else None
 pull_everything = MODE == "all"
 pull_new_only = MODE == "new_only"
 REQUEST_SLEEP = 1  # seconds between episode requests
