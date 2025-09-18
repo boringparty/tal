@@ -76,7 +76,7 @@ while archive_url:
         title_meta = ep_page.select_one("script#playlist-data")
         if not title_meta:
             continue
-        player_data = requests.utils.json.loads(title_meta.string)
+        player_data = json.loads(title_meta.string)
         if "audio" not in player_data:
             continue
 
