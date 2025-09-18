@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       MODE:
-        description: "Scraper mode: test5 | all | new_only"
+        description: "Scraper mode: test | all | new_only"
         required: false
         default: "new_only"
   schedule:
