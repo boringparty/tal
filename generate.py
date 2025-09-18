@@ -85,12 +85,16 @@ while archive_url:
         if "audio" not in player_data:
             continue
         ep_num = player_data["title"].split(":", 1)[0].strip()
+        title = player_data["title"].strip()
 
         # Skip already-seen episodes
         if pull_new_only and ep_num in existing_episodes:
             continue
         if pull_new_only and episode_date and episode_date.date() < yesterday.date():
             continue
+
+        # --- Detect repeat ---
+        is_repeat = "Originally aired" in title
 
         # --- Audio URLs ---
         audio_url = player_data["audio"]
@@ -99,7 +103,7 @@ while archive_url:
         clean_url = urlunparse(parsed._replace(query=""))
 
         if "/promos/" in clean_url:
-            player_data["title"] += " (Promo)"
+            title += " (Promo)"
 
         # --- Build description ---
         desc_parts = []
@@ -132,11 +136,14 @@ while archive_url:
 
         full_description = "\n\n".join(desc_parts)
 
-        # --- Build item HTML ---
+        # --- Build item HTML for normal ---
         pub_date_str = episode_date.strftime("%a, %d %b %Y 00:00:00 +0000") if episode_date else ""
+        normal_tags = ["Repeat"] if is_repeat else []
+        normal_title = f"{title} ({', '.join(normal_tags)})" if normal_tags else title
+
         item_block = f"""
     <item>
-      <title>{player_data['title'].strip()}</title>
+      <title>{normal_title}</title>
       <link>{full_url.strip()}</link>
       <itunes:episode>{ep_num}</itunes:episode>
       <itunes:episodeType>full</itunes:episodeType>
@@ -147,16 +154,18 @@ while archive_url:
     </item>
 """
         items_html += item_block
-        existing_episodes.add(ep_num)
-        count += 1
 
         # --- Optional clean version ---
         clean_link_tag = episode.select_one('a[href*="clean"]')
         if clean_link_tag:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
+            clean_tags = ["Clean"]
+            if is_repeat:
+                clean_tags.append("Repeat")
+            clean_title = f"{title} ({', '.join(clean_tags)})"
             clean_item_block = f"""
     <item>
-      <title>{player_data['title']} (Clean)</title>
+      <title>{clean_title}</title>
       <link>{full_url.strip()}</link>
       <itunes:episode>{ep_num}</itunes:episode>
       <itunes:episodeType>full</itunes:episodeType>
@@ -168,6 +177,8 @@ while archive_url:
 """
             items_html += clean_item_block
 
+        existing_episodes.add(ep_num)
+        count += 1
         time.sleep(REQUEST_SLEEP)
 
     # --- Next page ---
