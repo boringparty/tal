@@ -129,7 +129,7 @@ while archive_url:
         full_desc = "\n\n".join(desc_parts)
 
         # --- Build item ---
-        title_suffix = " (Repeat)" if is_repeat else ""
+        title_suffix = " - Repeat" if is_repeat else ""
         item_block = f"""
     <item>
       <title>{ep_title}{title_suffix}</title>
@@ -174,7 +174,7 @@ while archive_url:
 
 # --- Write feed ---
 if new_items.strip():
-    feed_content = feed_content.replace(BASE_FOOTER, new_items + BASE_FOOTER)
+    feed_content = feed_content.replace(BASE_HEADER, BASE_HEADER + new_items)
     with open(FEED_FILE, "w", encoding="utf-8") as f:
         f.write(feed_content)
     print("Feed updated with new episodes.")
