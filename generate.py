@@ -31,22 +31,28 @@ BASE_FOOTER = """
 </rss>
 """
 
+FEED_FILE = "feed.xml"
+existing_episodes = {}  # ep_num -> (title, original_air_date)
+
 # --- LOAD EXISTING EPISODES ---
-existing_episodes = set()
-if pull_new_only and os.path.exists("feed.xml"):
-    with open("feed.xml", "r", encoding="utf-8") as f:
+if os.path.exists(FEED_FILE):
+    with open(FEED_FILE, "r", encoding="utf-8") as f:
         old_feed = BeautifulSoup(f.read(), "xml")
         for item in old_feed.find_all("item"):
             ep_tag = item.find("itunes:episode")
-            if ep_tag:
-                existing_episodes.add(ep_tag.text.strip())
+            title_tag = item.find("title")
+            pub_date_tag = item.find("pubDate")
+            if ep_tag and title_tag and pub_date_tag:
+                ep_num = ep_tag.text.strip()
+                title_text = title_tag.text.strip()
+                pub_date_text = pub_date_tag.text.strip()
+                existing_episodes[ep_num] = (title_text, pub_date_text)
 
 # --- SETUP ---
 archive_url = "https://www.thisamericanlife.org/archive"
 session = requests.Session()
-today = datetime.utcnow()
-yesterday = today - timedelta(days=1)
-
+scrape_date = datetime.utcnow()
+yesterday = scrape_date - timedelta(days=1)
 items_html = ""
 
 # --- SCRAPING LOOP ---
@@ -71,9 +77,11 @@ while archive_url:
         # --- Episode date ---
         date_span = episode.select_one("span.date-display-single")
         episode_date = None
+        original_air_date_str = ""
         if date_span:
             try:
                 episode_date = datetime.strptime(date_span.text.strip(), "%B %d, %Y")
+                original_air_date_str = episode_date.strftime("%Y-%m-%d")
             except Exception:
                 pass
 
@@ -85,16 +93,13 @@ while archive_url:
         if "audio" not in player_data:
             continue
         ep_num = player_data["title"].split(":", 1)[0].strip()
-        title = player_data["title"].strip()
+        ep_title_base = ":".join(player_data["title"].split(":", 1)[1:]).strip()
 
-        # Skip already-seen episodes
+        # --- Skip new_only if already in feed ---
         if pull_new_only and ep_num in existing_episodes:
             continue
         if pull_new_only and episode_date and episode_date.date() < yesterday.date():
             continue
-
-        # --- Detect repeat ---
-        is_repeat = "Originally aired" in title
 
         # --- Audio URLs ---
         audio_url = player_data["audio"]
@@ -102,8 +107,28 @@ while archive_url:
         parsed = urlparse(final_url)
         clean_url = urlunparse(parsed._replace(query=""))
 
+        # Skip promos
         if "/promos/" in clean_url:
-            title += " (Promo)"
+            continue
+
+        # --- Determine repeat and clean labeling ---
+        is_repeat = ep_num in existing_episodes
+        clean_link_tag = episode.select_one('a[href*="clean"]')
+        has_clean = bool(clean_link_tag)
+
+        # Build episode title
+        title_parts = []
+        if has_clean:
+            title_parts.append("Clean")
+        if is_repeat:
+            title_parts.append(f"Repeat {original_air_date_str}")
+        if title_parts:
+            ep_title = f"{ep_num}: {ep_title_base} ({'; '.join(title_parts)})"
+        else:
+            ep_title = f"{ep_num}: {ep_title_base}"
+
+        # Explicit flag
+        explicit_flag = "no" if has_clean else "yes"
 
         # --- Build description ---
         desc_parts = []
@@ -136,36 +161,31 @@ while archive_url:
 
         full_description = "\n\n".join(desc_parts)
 
-        # --- Build item HTML for normal ---
-        pub_date_str = episode_date.strftime("%a, %d %b %Y 00:00:00 +0000") if episode_date else ""
-        normal_tags = ["Repeat"] if is_repeat else []
-        normal_title = f"{title} ({', '.join(normal_tags)})" if normal_tags else title
-
+        # --- Build item HTML ---
+        pub_date_str = scrape_date.strftime("%a, %d %b %Y 00:00:00 +0000")
         item_block = f"""
     <item>
-      <title>{normal_title}</title>
+      <title>{ep_title}</title>
       <link>{full_url.strip()}</link>
       <itunes:episode>{ep_num}</itunes:episode>
       <itunes:episodeType>full</itunes:episodeType>
-      <itunes:explicit>yes</itunes:explicit>
+      <itunes:explicit>{explicit_flag}</itunes:explicit>
       <description>{full_description}</description>
       <pubDate>{pub_date_str}</pubDate>
       <enclosure url="{clean_url}" type="audio/mpeg"/>
     </item>
 """
-        items_html += item_block
+        # Prepend newest first
+        items_html = item_block + items_html
+        existing_episodes[ep_num] = (ep_title, pub_date_str)
+        count += 1
 
-        # --- Optional clean version ---
-        clean_link_tag = episode.select_one('a[href*="clean"]')
-        if clean_link_tag:
+        # Optional clean version
+        if has_clean:
             clean_audio_url = urljoin("https://www.thisamericanlife.org", clean_link_tag["href"])
-            clean_tags = ["Clean"]
-            if is_repeat:
-                clean_tags.append("Repeat")
-            clean_title = f"{title} ({', '.join(clean_tags)})"
             clean_item_block = f"""
     <item>
-      <title>{clean_title}</title>
+      <title>{ep_title}</title>
       <link>{full_url.strip()}</link>
       <itunes:episode>{ep_num}</itunes:episode>
       <itunes:episodeType>full</itunes:episodeType>
@@ -175,10 +195,8 @@ while archive_url:
       <enclosure url="{clean_audio_url}" type="audio/mpeg"/>
     </item>
 """
-            items_html += clean_item_block
+            items_html = clean_item_block + items_html
 
-        existing_episodes.add(ep_num)
-        count += 1
         time.sleep(REQUEST_SLEEP)
 
     # --- Next page ---
@@ -186,7 +204,24 @@ while archive_url:
     archive_url = urljoin("https://www.thisamericanlife.org", next_link["href"]) if pull_everything and next_link else None
 
 # --- Write final feed ---
-with open("feed.xml", "w", encoding="utf-8") as f:
-    f.write(BASE_HEADER)
-    f.write(items_html)
-    f.write(BASE_FOOTER)
+if MODE in ("test5", "all"):
+    # overwrite feed
+    with open(FEED_FILE, "w", encoding="utf-8") as f:
+        f.write(BASE_HEADER)
+        f.write(items_html)
+        f.write(BASE_FOOTER)
+elif MODE == "new_only":
+    # append to existing feed
+    if os.path.exists(FEED_FILE):
+        with open(FEED_FILE, "r", encoding="utf-8") as f:
+            existing_content = f.read()
+        # inject new items before closing channel tag
+        new_feed = existing_content.replace("</channel>", items_html + "\n  </channel>")
+        with open(FEED_FILE, "w", encoding="utf-8") as f:
+            f.write(new_feed)
+    else:
+        # fallback: write new feed if it doesn't exist
+        with open(FEED_FILE, "w", encoding="utf-8") as f:
+            f.write(BASE_HEADER)
+            f.write(items_html)
+            f.write(BASE_FOOTER)
