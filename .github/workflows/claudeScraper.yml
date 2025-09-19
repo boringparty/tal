@@ -24,7 +24,7 @@ jobs:
           pip install requests beautifulsoup4
 
       - name: Run scraper script (latest mode)
-        run: python tal_scraper.py latest
+        run: python claudeGenerator.py latest
 
       - name: Commit and push new feed
         run: |
