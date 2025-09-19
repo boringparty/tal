@@ -3,7 +3,17 @@ name: Generate This American Life RSS Feed
 on:
   schedule:
     - cron: '0 18 * * 0' # 6 PM every Sunday
-  workflow_dispatch: # This line enables manual triggering
+  workflow_dispatch:
+    inputs:
+      run_type:
+        description: 'Type of scrape run'
+        required: true
+        default: 'latest'
+        type: choice
+        options:
+        - latest
+        - test
+        - all
 
 jobs:
   scrape-and-generate:
@@ -23,8 +33,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4
 
-      - name: Run scraper script (latest mode)
-        run: python claudeGenerator.py latest
+      - name: Run scraper script
+        run: python claudeGenerator.py ${{ github.event.inputs.run_type }}
 
       - name: Commit and push new feed
         run: |
