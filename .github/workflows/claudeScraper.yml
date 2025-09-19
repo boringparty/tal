@@ -3,6 +3,7 @@ name: Generate This American Life RSS Feed
 on:
   schedule:
     - cron: '0 18 * * 0' # 6 PM every Sunday
+  workflow_dispatch: # This line enables manual triggering
 
 jobs:
   scrape-and-generate:
@@ -23,12 +24,12 @@ jobs:
           pip install requests beautifulsoup4
 
       - name: Run scraper script (latest mode)
-        run: claudeGenerator.py latest
+        run: python tal_scraper.py latest
 
       - name: Commit and push new feed
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add feed.xml
+          git add claudeTal.xml
           git commit -m "Auto-generate RSS feed" || echo "No changes to commit"
           git push
